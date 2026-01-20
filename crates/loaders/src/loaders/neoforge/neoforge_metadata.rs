@@ -13,7 +13,7 @@ pub struct NeoForgeMetaData {
     pub welcome: String,
     #[serde(rename = "mirrorList")]
     pub mirror_list: String,
-    #[serde(rename = "hideExtract")]
+    #[serde(rename = "hideExtract", default)]
     pub hide_extract: bool,
     pub data: HashMap<String, DataEntry>,
     pub processors: Vec<Processor>,
