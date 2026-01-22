@@ -43,6 +43,7 @@ tracing = { workspace = true, optional = true }
 
 # Filesystem & Compression
 async_zip.workspace = true
+zip = { workspace = true }
 
 # Cryptographie
 sha1.workspace = true
