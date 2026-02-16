@@ -390,7 +390,7 @@ pub async fn run_install_processors<V: VersionInfo>(
         }
     }
 
-    // Exécuter les processors
+    // Exécuter les processors (patchs) pour NeoForge
     patcher::run_processors(version, install_profile, installer_path).await?;
     
     if let Some(expected_sha1) = fetch_maven_sha1(&installer_url).await {
