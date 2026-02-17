@@ -103,10 +103,43 @@ impl<T: VersionInfo> Arguments for T {
         }
 
         // 3. Classpath (doit être en dernier avant la mainClass)
-        if !jvm_args.contains(&CP_FLAG.to_string()) {
+        let module_path_opt = jvm_args
+            .iter()
+            .position(|arg| arg == "-p")
+            .and_then(|p_idx| jvm_args.get(p_idx + 1).cloned());
+
+        if let Some(cp_idx) = jvm_args.iter().position(|arg| arg == CP_FLAG) {
+            // -cp existe déjà dans le version.json, il faut le remplacer par une version filtrée
+            if let Some(ref module_path) = module_path_opt {
+                lighty_core::trace_debug!("Module-path detected: {}", module_path);
+                if let Some(existing_cp) = jvm_args.get(cp_idx + 1) {
+                    let filtered_classpath =
+                        filter_classpath_from_modulepath(existing_cp, module_path);
+                    lighty_core::trace_debug!("Classpath filtered for module-path");
+
+                    // Remplacer le classpath existant
+                    jvm_args[cp_idx + 1] = filtered_classpath;
+                } else {
+                    lighty_core::trace_warn!("-cp found but no value after it");
+                }
+            } else {
+                lighty_core::trace_debug!("No module-path, keeping existing classpath unchanged");
+            }
+        } else {
+            // -cp n'existe pas, on l'ajoute (comportement normal pour Vanilla, Fabric, etc.)
             let classpath = variables.get(KEY_CLASSPATH).cloned().unwrap_or_default();
-            jvm_args.push(CP_FLAG.into());
-            jvm_args.push(classpath);
+
+            if let Some(ref module_path) = module_path_opt {
+                lighty_core::trace_debug!("Module-path detected: {}", module_path);
+                let filtered_classpath = filter_classpath_from_modulepath(&classpath, module_path);
+                lighty_core::trace_debug!("Classpath filtered for module-path");
+
+                jvm_args.push(CP_FLAG.into());
+                jvm_args.push(filtered_classpath);
+            } else {
+                jvm_args.push(CP_FLAG.into());
+                jvm_args.push(classpath);
+            }
         }
 
         // 4. Appliquer les JVM overrides
@@ -347,4 +380,77 @@ fn apply_arg_removals(game_args: Vec<String>, arg_removals: &HashSet<String>) ->
             })
         })
         .collect()
+}
+
+/// Filtre le classpath en excluant les JARs dont l'artefact est présent dans le module-path
+fn filter_classpath_from_modulepath(classpath: &str, module_path: &str) -> String {
+    let separator = get_path_separator();
+
+    let module_artifacts: std::collections::HashSet<String> = module_path
+        .split(separator)
+        .filter_map(|path| {
+            std::path::Path::new(path)
+                .file_name()
+                .and_then(|f| f.to_str())
+                .and_then(|filename| {
+                    // Extraire le nom de base de l'artefact en supprimant la version et l'extension
+                    // Exemple: "asm-analysis-9.5.jar" -> "asm-analysis"
+                    if let Some(stem) = filename.strip_suffix(".jar") {
+                        // Trouver la dernière position avant un chiffre
+                        let mut base_name = stem;
+                        if let Some(pos) = stem.rfind(|c: char| c.is_ascii_digit()) {
+                            // Remonter jusqu'au début de la version (après le dernier -)
+                            if let Some(dash_pos) = stem[..pos].rfind('-') {
+                                base_name = &stem[..dash_pos];
+                            }
+                        }
+                        Some(base_name.to_string())
+                    } else {
+                        None
+                    }
+                })
+        })
+        .collect();
+
+    lighty_core::trace_debug!("Module artifacts to exclude: {:?}", module_artifacts);
+
+    classpath
+        .split(separator)
+        .filter(|path| {
+            if let Some(filename) = std::path::Path::new(path)
+                .file_name()
+                .and_then(|f| f.to_str())
+            {
+                if let Some(stem) = filename.strip_suffix(".jar") {
+                    // Extraire le nom de base de l'artefact en supprimant la version et l'extension
+                    // Exemple: "asm-analysis-9.5.jar" -> "asm-analysis"
+                    let base_name = if let Some(pos) = stem.rfind(|c: char| c.is_ascii_digit()) {
+                        if let Some(dash_pos) = stem[..pos].rfind('-') {
+                            &stem[..dash_pos]
+                        } else {
+                            stem
+                        }
+                    } else {
+                        stem
+                    };
+                    // Garder le JAR dans le classpath seulement si son artefact n'est pas dans le module-path
+                    !module_artifacts.contains(base_name)
+                } else {
+                    true // Pas un JAR, garder par sécurité
+                }
+            } else {
+                true // Pas de nom de fichier, garder par sécurité
+            }
+        })
+        .collect::<Vec<&str>>()
+        .join(separator)
+}
+
+fn get_path_separator() -> &'static str {
+    #[cfg(target_os = "windows")] {
+        ";"
+    }
+    #[cfg(not(target_os = "windows"))] {
+        ":"
+    }
 }

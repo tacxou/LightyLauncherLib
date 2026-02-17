@@ -54,6 +54,11 @@ impl<F: Query> ManifestRepository<F> {
 
         Ok(manifest_data)
     }
+
+    pub async fn get_raw<V: VersionInfo>(&self, version: &V) -> Result<Arc<<F as Query>::Raw>> {
+        self.get_cached_version_data(version).await
+    }
+    
     async fn get_cached_version_data<V: VersionInfo>(&self, version: &V) -> Result<Arc<<F as Query>::Raw>> {
         let ttl = F::cache_ttl();
         let key = version.name().to_string();

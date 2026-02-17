@@ -19,4 +19,5 @@ pub fn build_temurin_url(version: &u8) -> DistributionResult<String> {
         "https://api.adoptium.net/v3/binary/latest/{}/ga/{}/{}/jre/hotspot/normal/eclipse?project=jdk",
         version, os_name, arch
     ))
+
 }

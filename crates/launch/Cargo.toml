@@ -69,3 +69,5 @@ nix = { version = "0.30.1", features = ["signal", "process"] }
 [features]
 default = []
 events = ["lighty-event", "lighty-java/events", "lighty-core/events"]
+# Ajout de neoforge dans les features pour pouvoir run le patcher après l'installation dans la crate launch
+neoforge = ["lighty-loaders/neoforge"]

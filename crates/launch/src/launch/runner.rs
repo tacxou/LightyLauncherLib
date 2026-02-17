@@ -16,6 +16,9 @@ use lighty_java::runtime::JavaRuntime;
 use crate::arguments::Arguments;
 use std::collections::{HashMap,HashSet};
 
+#[cfg(feature = "neoforge")]
+use lighty_loaders::neoforge::neoforge::{run_install_processors, NEOFORGE};
+
 #[cfg(feature = "events")]
 use lighty_event::EventBus;
 
@@ -100,6 +103,15 @@ where
             #[cfg(feature = "events")]
             event_bus,
         ).await?);
+
+        // 3b. Exécuter les processors NeoForge (après download des libraries)
+        // TODO: Ajouter un système de processors pour les loaders qui en ont besoin (ex: NeoForge) 
+        // (à exécuter après l'installation des libraries mais avant le lancement du jeu)
+        #[cfg(feature = "neoforge")]
+        if matches!(version.loader(), Loader::NeoForge) {
+            let install_profile = NEOFORGE.get_raw(version).await?;
+            run_install_processors(version, install_profile.as_ref()).await?;
+        }
 
         // 4. Lancer le jeu
         execute_game(
