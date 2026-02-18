@@ -1,9 +1,14 @@
 use std::{fmt::Debug,
-          path::{Path, PathBuf}
+          path::{Path, PathBuf},
+          sync::Arc
 };
 use once_cell::sync::Lazy;
 use directories::ProjectDirs;
 use lighty_loaders::types::VersionInfo;
+use lighty_loaders::types::version_metadata::{Library, Mods, AssetsFile, VersionMetaData, Version};
+use lighty_loaders::types::Loader;
+use lighty_loaders::types::LoaderExtensions;
+use lighty_loaders::utils::error::QueryError;
 
 /// Structure principale pour configurer une version Minecraft avec un loader
 ///
@@ -29,6 +34,9 @@ pub struct VersionBuilder<'a, L = ()> {
     pub project_dirs: &'a Lazy<ProjectDirs>,
     pub game_dirs: PathBuf,
     pub java_dirs: PathBuf,
+    pub custom_mods: Option<Vec<Mods>>,
+    pub custom_assets: Option<AssetsFile>,
+    pub custom_libraries: Option<Vec<Library>>,
 }
 
 impl<'a, L> VersionBuilder<'a, L> {
@@ -52,6 +60,9 @@ impl<'a, L> VersionBuilder<'a, L> {
             project_dirs,
             game_dirs: project_dirs.data_dir().join(name),
             java_dirs: project_dirs.config_dir().to_path_buf().join("jre"),
+            custom_mods: None,
+            custom_assets: None,
+            custom_libraries: None,
         }
     }
 
@@ -96,6 +107,58 @@ impl<'a, L> VersionBuilder<'a, L> {
         self.minecraft_version = version.to_string();
         self
     }
+
+    /// Ajoute des mods personnalisés
+    ///
+    /// # Exemple
+    /// ```rust
+    /// let builder = VersionBuilder::new(...)
+    ///     .with_mods(vec![
+    ///         Mods {
+    ///             name: "MyMod-1.0.jar".to_string(),
+    ///             url: Some("https://...".to_string()),
+    ///             path: Some("mods/MyMod-1.0.jar".to_string()),
+    ///             sha1: Some("...".to_string()),
+    ///             size: Some(1024000),
+    ///         }
+    ///     ]);
+    /// ```
+    pub fn with_mods(mut self, mods: Vec<Mods>) -> Self {
+        self.custom_mods = Some(mods);
+        self
+    }
+
+    /// Ajoute des assets personnalisés
+    ///
+    /// # Exemple
+    /// ```rust
+    /// let builder = VersionBuilder::new(...)
+    ///     .with_assets(AssetsFile { objects: HashMap::new() });
+    /// ```
+    pub fn with_assets(mut self, assets: AssetsFile) -> Self {
+        self.custom_assets = Some(assets);
+        self
+    }
+
+    /// Ajoute des libraries personnalisées
+    ///
+    /// # Exemple
+    /// ```rust
+    /// let builder = VersionBuilder::new(...)
+    ///     .with_libraries(vec![
+    ///         Library {
+    ///             name: "com.example:lib:1.0".to_string(),
+    ///             url: Some("https://...".to_string()),
+    ///             path: Some("libraries/com/example/lib/1.0/lib-1.0.jar".to_string()),
+    ///             sha1: Some("...".to_string()),
+    ///             size: Some(2048000),
+    ///         }
+    ///     ]);
+    /// ```
+    pub fn with_libraries(mut self, libraries: Vec<Library>) -> Self {
+        self.custom_libraries = Some(libraries);
+        self
+    }
 }
 
 impl<'a, L: Clone + Send + Sync + Debug> VersionInfo for VersionBuilder<'a, L> {
@@ -123,6 +186,18 @@ impl<'a, L: Clone + Send + Sync + Debug> VersionInfo for VersionBuilder<'a, L> {
 
     fn loader(&self) -> &Self::LoaderType {
         &self.loader
+    }
+
+    fn get_custom_mods(&self) -> Option<&Vec<Mods>> {
+        self.custom_mods.as_ref()
+    }
+    
+    fn get_custom_libraries(&self) -> Option<&Vec<Library>> {
+        self.custom_libraries.as_ref()
+    }
+    
+    fn get_custom_assets(&self) -> Option<&AssetsFile> {
+        self.custom_assets.as_ref()
     }
 }
 
@@ -154,3 +229,5 @@ impl<'a, 'b, L: Clone + Send + Sync + Debug> VersionInfo for &'b VersionBuilder<
         &self.loader
     }
 }
+
+

@@ -1,4 +1,5 @@
 use std::path::Path;
+use super::version_metadata::{Mods, Library, AssetsFile};
 
 /// Trait générique pour représenter les informations d'une version
 ///
@@ -80,5 +81,32 @@ pub trait VersionInfo: Clone + Send + Sync {
     /// Une instance est considérée comme installée si son répertoire de jeu existe
     fn is_installed(&self) -> bool {
         self.game_dirs().exists()
+    }
+
+    /// Retourne les custom mods si disponibles
+    ///
+    /// Cette méthode est utilisée par les loaders pour inclure des mods personnalisés
+    /// dans les métadonnées de version. Par défaut, retourne `None`.
+    /// Implémentée par VersionBuilder pour fournir des mods personnalisés.
+    fn get_custom_mods(&self) -> Option<&Vec<Mods>> {
+        None
+    }
+
+    /// Retourne les custom libraries si disponibles
+    ///
+    /// Cette méthode est utilisée par les loaders pour inclure des libraries personnalisées
+    /// dans les métadonnées de version. Par défaut, retourne `None`.
+    /// Implémentée par VersionBuilder pour fournir des libraries personnalisées.
+    fn get_custom_libraries(&self) -> Option<&Vec<Library>> {
+        None
+    }
+
+    /// Retourne les custom assets si disponibles
+    ///
+    /// Cette méthode est utilisée par les loaders pour inclure des assets personnalisés
+    /// dans les métadonnées de version. Par défaut, retourne `None`.
+    /// Implémentée par VersionBuilder pour fournir des assets personnalisés.
+    fn get_custom_assets(&self) -> Option<&AssetsFile> {
+        None
     }
 }

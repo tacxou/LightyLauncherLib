@@ -193,7 +193,8 @@ fn create_variable_map<T: VersionInfo>(
         map.insert(KEY_VERSION_TYPE.into(), DEFAULT_VERSION_TYPE.into());
 
         // Directories
-        map.insert(KEY_GAME_DIRECTORY.into(), version.game_dirs().join("runtime").display().to_string());
+        // Remove .join("runtime") since it's not a standard directory used in arguments and can cause confusion.
+        map.insert(KEY_GAME_DIRECTORY.into(), version.game_dirs().display().to_string());
         map.insert(KEY_ASSETS_ROOT.into(), version.game_dirs().join("assets").display().to_string());
         map.insert(KEY_NATIVES_DIRECTORY.into(), version.game_dirs().join("natives").display().to_string());
         map.insert(KEY_LIBRARY_DIRECTORY.into(), version.game_dirs().join("libraries").display().to_string());

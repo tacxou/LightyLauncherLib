@@ -4,6 +4,7 @@
 //! Native libraries installation and extraction module
 
 use std::path::PathBuf;
+use std::collections::HashSet;
 use async_zip::tokio::read::seek::ZipFileReader;
 use tokio::fs;
 use tokio::io::BufReader;
@@ -13,7 +14,7 @@ use futures::future::try_join_all;
 use futures_util::io;
 use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 use crate::errors::{InstallerError, InstallerResult};
-use super::verifier::needs_download;
+use super::verifier::{needs_download, verify_files_in_allowlist};
 use super::downloader::download_with_concurrency_limit;
 
 #[cfg(feature = "events")]
@@ -46,6 +47,56 @@ pub async fn collect_native_tasks(
     }
 
     (download_tasks, extract_paths)
+}
+
+/// Collects natives that need to be downloaded with allowlist verification
+///
+/// This function verifies that all natives are in the allowed list before processing.
+/// Natives outside the allowlist will be blocked from installation.
+///
+/// # Arguments
+/// * `version` - Game version info
+/// * `natives` - Slice of natives to process
+/// * `allowed_files` - Set of allowed file paths (can use patterns like "*.jar", "libraries/*")
+///
+/// # Returns
+/// A tuple containing (download_tasks, extract_paths) or an error if verification fails
+pub async fn collect_native_tasks_with_allowlist(
+    version: &impl VersionInfo,
+    natives: &[Native],
+    allowed_files: &HashSet<String>,
+) -> InstallerResult<(Vec<(String, PathBuf)>, Vec<PathBuf>)> {
+    if natives.is_empty() {
+        return Ok((Vec::new(), Vec::new()));
+    }
+
+    // Extract file paths from natives for verification
+    let native_paths: Vec<&str> = natives
+        .iter()
+        .filter_map(|n| n.path.as_ref().map(|p| p.as_str()))
+        .collect();
+
+    // Verify all native paths are authorized
+    verify_files_in_allowlist(&native_paths, allowed_files)?;
+
+    let libraries_path = version.game_dirs().join("libraries");
+    let mut download_tasks = Vec::new();
+    let mut extract_paths = Vec::new();
+
+    for native in natives {
+        let Some(url) = &native.url else { continue };
+        let Some(path_str) = &native.path else { continue };
+
+        let jar_path = libraries_path.join(path_str);
+
+        if needs_download(&jar_path, native.sha1.as_ref(), &native.name).await {
+            download_tasks.push((url.clone(), jar_path.clone()));
+        }
+
+        extract_paths.push(jar_path);
+    }
+
+    Ok((download_tasks, extract_paths))
 }
 
 /// Downloads and extracts natives from pre-collected tasks

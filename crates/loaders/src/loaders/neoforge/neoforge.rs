@@ -126,13 +126,15 @@ impl Query for NeoForgeQuery {
         // Fusionner : Vanilla + version.json (priorité au version.json)
         let merged_libs = merge_libraries(vanilla_builder.libraries, version_json_libs);
 
-        // Merger directement avec Vanilla en priorité
+        // Merger directly with Vanilla taking priority
+        let custom_mods = version.get_custom_mods().cloned();
+        
         Ok(Version {
             main_class: merge_main_class(vanilla_builder.main_class, extract_main_class(&version_meta)),
             java_version: vanilla_builder.java_version,
             arguments: merge_arguments(vanilla_builder.arguments, extract_arguments(&version_meta)),
             libraries: merged_libs,
-            mods: None,
+            mods: custom_mods,
             natives: vanilla_builder.natives,
             client: vanilla_builder.client,
             assets_index: vanilla_builder.assets_index,

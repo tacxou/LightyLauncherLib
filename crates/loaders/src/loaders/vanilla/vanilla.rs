@@ -91,12 +91,14 @@ impl Query for VanillaQuery {
     }
 
     async fn version_builder<V: VersionInfo>(version: &V, full_data: &VanillaMetaData) -> Result<Version> {
+        let custom_mods = version.get_custom_mods().cloned();
+        
         Ok(Version {
             main_class: extract_main_class(full_data),
             java_version: extract_java_version(full_data),
             arguments: extract_arguments(full_data),
             libraries: extract_libraries(full_data),
-            mods: None,
+            mods: custom_mods,
             natives: Some(extract_natives(full_data)?),
             client: extract_client(version, full_data).ok(),
             assets_index: Some(extract_assets_index(full_data)),

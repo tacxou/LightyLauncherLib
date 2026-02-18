@@ -62,12 +62,14 @@ impl Query for FabricQuery {
     )?;
 
         // Merger directement avec Vanilla en priorité
+        let custom_mods = version.get_custom_mods().cloned();
+        
         Ok(Version {
             main_class: merge_main_class(vanilla_builder.main_class, extract_main_class(full_data)),
             java_version: vanilla_builder.java_version,
             arguments: merge_arguments(vanilla_builder.arguments, extract_arguments(full_data)),
             libraries: merge_libraries(vanilla_builder.libraries, fabric_libraries),
-            mods: None,
+            mods: custom_mods,
             natives: vanilla_builder.natives,
             client: vanilla_builder.client,
             assets_index: vanilla_builder.assets_index,

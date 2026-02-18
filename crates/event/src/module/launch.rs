@@ -52,4 +52,14 @@ pub enum LaunchEvent {
         pid: u32,
         exit_code: i32,
     },
+    /// Files cleanup started (removing unauthorized files)
+    FilesCleanupStarted,
+    /// Files cleanup completed
+    FilesCleanupCompleted {
+        removed_count: usize,
+    },
+    /// Files cleanup failed
+    FilesCleanupFailed {
+        reason: String,
+    },
 }

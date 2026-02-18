@@ -2,7 +2,7 @@ use lighty_java::JreError;
 use lighty_core::time_it;
 use lighty_java::jre_downloader::jre_download;
 use lighty_java::JavaDistribution;
-use lighty_loaders::types::version_metadata::Version;
+use lighty_loaders::types::version_metadata::{Version, Library, Native, Client};
 use crate::errors::{InstallerError, InstallerResult};
 use crate::installer::Installer;
 use super::builder::LaunchBuilder;
@@ -15,6 +15,7 @@ use lighty_java::jre_downloader::find_java_binary;
 use lighty_java::runtime::JavaRuntime;
 use crate::arguments::Arguments;
 use std::collections::{HashMap,HashSet};
+use crate::installer::{cleanup_game_directories, create_files_allowlist};
 
 #[cfg(feature = "neoforge")]
 use lighty_loaders::neoforge::neoforge::{run_install_processors, NEOFORGE};
@@ -112,6 +113,14 @@ where
             let install_profile = NEOFORGE.get_raw(version).await?;
             run_install_processors(version, install_profile.as_ref()).await?;
         }
+
+        //3c. Nettoyage automatique des fichiers non autorisés basé sur les métadonnées
+        cleanup_unauthorized_files_step3c(
+            version,
+            &metadata,
+            #[cfg(feature = "events")]
+            event_bus,
+        ).await?;
 
         // 4. Lancer le jeu
         execute_game(
@@ -322,6 +331,139 @@ fn extract_version(metadata: &VersionMetaData) -> InstallerResult<&Version> {
     match metadata {
         VersionMetaData::Version(v) => Ok(v),
         _ => Err(InstallerError::InvalidMetadata),
+    }
+}
+
+/// Étape 3c: Nettoyage automatique des fichiers non autorisés basé sur les métadonnées
+/// 
+/// Cette fonction crée une allowlist basée sur les mods, libraries et natives installés
+/// via les métadonnées, puis nettoie automatiquement tous les fichiers non autorisés
+/// dans les répertoires du jeu (mods/, libraries/, natives/).
+async fn cleanup_unauthorized_files_step3c<T>(
+    version: &T,
+    metadata: &Arc<VersionMetaData>,
+    #[cfg(feature = "events")] event_bus: Option<&EventBus>,
+) -> InstallerResult<()>
+where
+    T: VersionInfo,
+{
+    // Extraire la version pour accéder à la liste des fichiers à télécharger
+    let version_data = extract_version(metadata)?;
+
+    // Créer une allowlist complète à partir des fichiers qui DOIVENT être présents
+    let mut allowed_patterns: Vec<String> = vec![
+        // Fichiers de configuration du launcher
+        "*.json".to_string(),
+        "*.yaml".to_string(),
+        "*.yml".to_string(),
+        "*.toml".to_string(),
+        "*.cfg".to_string(),
+        "config/*".to_string(),
+        "modlist.html".to_string(),
+        "instance.json".to_string(),
+        // Library files (managed by loaders and version system)
+        "libraries/**".to_string(),
+        // Native files (extracted from JAR archives)
+        "natives/*.dll".to_string(),
+        "natives/*.so".to_string(),
+        "natives/*.dylib".to_string(),
+    ];
+
+    // Ajouter tous les noms de mods depuis les métadonnées
+    if let Some(mods_list) = &version_data.mods {
+        for mod_entry in mods_list {
+            // Ajouter BOTH versions: avec URL encoding et décodé
+            if let Some(path) = &mod_entry.path {
+                // Ajouter le chemin EXACT du mod (avec URL encoding)
+                allowed_patterns.push(format!("mods/{}", path));
+                
+                // Ajouter aussi la version décodée
+                let decoded_path = path.replace("%2B", "+")
+                    .replace("%2b", "+")
+                    .replace("%20", " ")
+                    .replace("%25", "%");
+                if decoded_path != *path {
+                    allowed_patterns.push(format!("mods/{}", decoded_path));
+                }
+                lighty_core::trace_info!("[Launch 3c] Added mod to allowlist: mods/{} (and mods/{})", path, decoded_path);
+            } else {
+                allowed_patterns.push(format!("mods/{}", mod_entry.name));
+                lighty_core::trace_info!("[Launch 3c] Added mod to allowlist: mods/{}", mod_entry.name);
+            }
+        }
+    }
+
+    // Ajouter tous les noms de libraries depuis les métadonnées
+    for lib in &version_data.libraries {
+        if let Some(path) = &lib.path {
+            allowed_patterns.push(format!("libraries/{}", path));
+        }
+    }
+
+    // Ajouter le client JAR
+    if let Some(client) = &version_data.client {
+        allowed_patterns.push(client.name.clone());
+    }
+
+    // Ajouter les natives
+    if let Some(natives) = &version_data.natives {
+        for native in natives {
+            if let Some(path) = &native.path {
+                allowed_patterns.push(format!("natives/{}", path));
+            } else {
+                // Si pas de path, utiliser le nom
+                allowed_patterns.push(format!("natives/{}", native.name));
+            }
+        }
+    }
+
+    // Convertir en &[&str] pour create_files_allowlist
+    let pattern_refs: Vec<&str> = allowed_patterns.iter().map(|s| s.as_str()).collect();
+    let allowlist = create_files_allowlist(&pattern_refs);
+
+    lighty_core::trace_info!("[Launch 3c] Starting automatic cleanup with {} allowed patterns", pattern_refs.len());
+
+    #[cfg(feature = "events")]
+    if let Some(bus) = event_bus {
+        bus.emit(lighty_event::Event::Launch(lighty_event::LaunchEvent::FilesCleanupStarted));
+    }
+
+    let game_dir = version.game_dirs().to_path_buf();
+    match cleanup_game_directories(&game_dir, &allowlist).await {
+        Ok((mods_count, libs_count, natives_count)) => {
+            let total = mods_count + libs_count + natives_count;
+            
+            if total > 0 {
+                lighty_core::trace_info!(
+                    "[Launch 3c] ✓ Cleanup completed: {} mods, {} libraries, {} natives removed",
+                    mods_count, libs_count, natives_count
+                );
+
+                #[cfg(feature = "events")]
+                if let Some(bus) = event_bus {
+                    bus.emit(lighty_event::Event::Launch(lighty_event::LaunchEvent::FilesCleanupCompleted {
+                        removed_count: total,
+                    }));
+                }
+            } else {
+                lighty_core::trace_debug!("[Launch 3c] ✓ No unauthorized files found");
+            }
+
+            Ok(())
+        }
+        Err(e) => {
+            // Les erreurs de nettoyage ne doivent pas empêcher le lancement
+            lighty_core::trace_warn!("[Launch 3c] Cleanup encountered an error (non-fatal): {}", e);
+            
+            #[cfg(feature = "events")]
+            if let Some(bus) = event_bus {
+                bus.emit(lighty_event::Event::Launch(lighty_event::LaunchEvent::FilesCleanupFailed {
+                    reason: format!("{}", e),
+                }));
+            }
+
+            Ok(())
+        }
     }
 }
 

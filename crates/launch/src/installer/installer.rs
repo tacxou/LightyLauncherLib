@@ -11,9 +11,11 @@
 //! - Mods (optional modifications)
 
 use super::{libraries, natives, client, assets, mods};
+use super::verifier::cleanup_game_directories;
 use lighty_loaders::types::{VersionInfo, version_metadata::Version};
 use lighty_core::{mkdir, time_it};
 use crate::errors::InstallerResult;
+use std::collections::HashSet;
 
 #[cfg(feature = "events")]
 use lighty_event::{EventBus, Event, LaunchEvent};
@@ -161,10 +163,62 @@ impl<T: VersionInfo> Installer for T {
 /// Creates necessary installation directories
 async fn create_directories(version: &impl VersionInfo) {
     let parent_path = version.game_dirs().to_path_buf();
-    mkdir!(parent_path.join("runtime"));
+    // mkdir!(parent_path.join("runtime"));
     mkdir!(parent_path.join("libraries"));
     mkdir!(parent_path.join("natives"));
     mkdir!(parent_path.join("assets").join("objects"));
+}
+
+/// Installs the game and cleans up unauthorized files
+///
+/// This is a convenience function that performs a standard installation
+/// followed by cleanup of any files not in the allowlist.
+///
+/// # Arguments
+/// * `version` - The game version info implementing VersionInfo
+/// * `builder` - The version metadata containing all game components
+/// * `allowed_files` - Optional set of allowed file paths/patterns for cleanup
+/// * `event_bus` - Optional event bus for progress tracking
+///
+/// # Returns
+/// Ok(()) if installation and cleanup succeed, or an error otherwise
+pub async fn install_with_cleanup<T: VersionInfo + Installer>(
+    version: &T,
+    builder: &Version,
+    allowed_files: Option<&HashSet<String>>,
+    #[cfg(feature = "events")] event_bus: Option<&EventBus>,
+) -> InstallerResult<()> {
+    // Perform standard installation
+    version.install(
+        builder,
+        #[cfg(feature = "events")]
+        event_bus,
+    )
+    .await?;
+
+    // If an allowlist was provided, clean up unauthorized files
+    if let Some(allowed) = allowed_files {
+        lighty_core::trace_info!("[Installer] Cleaning up unauthorized files...");
+        let game_dir = version.game_dirs().to_path_buf();
+        match cleanup_game_directories(&game_dir, allowed).await {
+            Ok((mods_count, libs_count, natives_count)) => {
+                if mods_count > 0 || libs_count > 0 || natives_count > 0 {
+                    lighty_core::trace_info!(
+                        "[Installer] ✓ Cleanup completed: {} mods, {} libraries, {} natives removed",
+                        mods_count, libs_count, natives_count
+                    );
+                } else {
+                    lighty_core::trace_info!("[Installer] ✓ No unauthorized files found");
+                }
+            }
+            Err(e) => {
+                lighty_core::trace_warn!("[Installer] Cleanup encountered an error: {}", e);
+                // Don't fail the installation if cleanup fails
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// Calculates the total size of files that need to be downloaded (from tasks)

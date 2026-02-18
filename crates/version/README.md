@@ -15,6 +15,8 @@ Version management and builders for [LightyLauncher](https://crates.io/crates/li
 - **LightyVersionBuilder** - Custom server version builder for LightyUpdater
 - **VersionInfo Implementation** - Implements core version trait
 - **Directory Management** - Configurable game and Java directories
+- **Custom Content Injection** - Add custom mods, libraries, and assets
+- **Automatic Merge via LoaderExtensionsWithMerge** - Seamless integration with installer
 - **Type Safety** - Strongly typed version information
 
 ## Quick Start
@@ -22,6 +24,53 @@ Version management and builders for [LightyLauncher](https://crates.io/crates/li
 ```toml
 [dependencies]
 lighty-version = "0.8.6"
+```
+
+## Adding Custom Mods, Libraries, and Assets
+
+### Overview
+
+With `LoaderExtensionsWithMerge`, you can add custom mods, libraries, and assets to any loader instance. These are automatically merged into the loader's metadata during installation.
+
+### Builder Methods
+
+```rust
+let instance = VersionBuilder::new(...)
+    .with_mods(vec![
+        Mods {
+            name: "my-mod.jar".to_string(),
+            url: Some("https://...".to_string()),
+            path: Some("mods/my-mod.jar".to_string()),
+            sha1: Some("hash...".to_string()),
+            size: Some(1024000),
+        }
+    ])
+    .with_libraries(vec![
+        Library {
+            name: "com.example:lib:1.0".to_string(),
+            url: Some("https://...".to_string()),
+            path: Some("libraries/com/example/lib/1.0/lib-1.0.jar".to_string()),
+            sha1: Some("hash...".to_string()),
+            size: Some(2048000),
+        }
+    ])
+    .with_assets(AssetsFile { objects: HashMap::new() });
+```
+
+### Automatic Merge During Installation
+
+The `LoaderExtensionsWithMerge` trait automatically merges custom content when the installer runs:
+
+```rust
+use lighty_version::LoaderExtensionsWithMerge;
+
+// Custom content automatically merged when metadata is fetched
+let metadata = instance.get_metadata_merged().await?;
+
+// Or use directly in launch - the merge happens automatically
+instance.launch(&profile, JavaDistribution::Temurin)
+    .run()
+    .await?;
 ```
 
 ### VersionBuilder (Standard Loaders)

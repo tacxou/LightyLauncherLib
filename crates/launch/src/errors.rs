@@ -32,6 +32,9 @@ pub enum InstallerError {
 
     #[error("Unable to get process ID from child process")]
     NoPid,
+
+    #[error("Files not in allowlist: {0}")]
+    FilesNotAllowed(String),
 }
 
 pub type InstallerResult<T> = std::result::Result<T, InstallerError>;
