@@ -207,6 +207,109 @@ impl ProcessorContext {
     }
 }
 
+/// Télécharge toutes les bibliothèques nécessaires pour les processors
+pub async fn download_install_profile_libraries<V: VersionInfo>(
+    version: &V,
+    metadata: &NeoForgeMetaData,
+) -> Result<()> {
+    let libraries_dir = version.game_dirs().join("libraries");
+    let mut download_tasks = Vec::new();
+
+    // Collecter toutes les bibliothèques à télécharger
+    for lib in &metadata.libraries {
+        let path = libraries_dir.join(&lib.downloads.artifact.path);
+
+        // Vérifier si le fichier existe et si le SHA1 correspond
+        let needs_download = if path.exists() {
+            match lighty_core::verify_file_sha1(&path, &lib.downloads.artifact.sha1).await {
+                Ok(true) => false,
+                _ => true,
+            }
+        } else {
+            true
+        };
+
+        if needs_download {
+            download_tasks.push((
+                lib.downloads.artifact.url.clone(),
+                path,
+                lib.downloads.artifact.sha1.clone(),
+            ));
+        }
+    }
+
+    if download_tasks.is_empty() {
+        lighty_core::trace_info!(
+            loader = "neoforge",
+            "All install_profile libraries already cached and verified"
+        );
+        return Ok(());
+    }
+
+    lighty_core::trace_info!(
+        loader = "neoforge",
+        count = download_tasks.len(),
+        "Downloading install_profile libraries..."
+    );
+
+    // Télécharger toutes les bibliothèques en parallèle avec une limite de concurrence
+    let semaphore = std::sync::Arc::new(tokio::sync::Semaphore::new(10));
+    let mut handles = Vec::new();
+
+    for (url, path, expected_sha1) in download_tasks {
+        let permit = semaphore.clone().acquire_owned().await.map_err(|e| {
+            QueryError::Conversion {
+                message: format!("Failed to acquire semaphore: {}", e),
+            }
+        })?;
+
+        let handle = tokio::spawn(async move {
+            let _permit = permit; // Will be dropped when task completes
+
+            // Créer le répertoire parent si nécessaire
+            if let Some(parent) = path.parent() {
+                mkdir!(parent);
+            }
+
+            // Télécharger le fichier
+            download_file_untracked(&url, &path).await.map_err(|e| {
+                QueryError::Conversion {
+                    message: format!("Failed to download library: {}", e),
+                }
+            })?;
+
+            // Vérifier le SHA1
+            match lighty_core::verify_file_sha1(&path, &expected_sha1).await {
+                Ok(true) => Ok(()),
+                Ok(false) => Err(QueryError::Conversion {
+                    message: format!(
+                        "SHA1 mismatch for downloaded file: {}",
+                        path.display()
+                    ),
+                }),
+                Err(e) => Err(QueryError::Conversion {
+                    message: format!("Failed to verify SHA1: {}", e),
+                }),
+            }
+        });
+
+        handles.push(handle);
+    }
+
+    // Attendre que tous les téléchargements soient terminés
+    for handle in handles {
+        handle.await.map_err(|e| QueryError::Conversion {
+            message: format!("Download task failed: {}", e),
+        })??;
+    }
+
+    lighty_core::trace_info!(
+        loader = "neoforge",
+        "All install_profile libraries downloaded successfully"
+    );
+
+    Ok(())
+}
 
 /// Exécute tous les processors pour le côté spécifié
 pub async fn run_processors<V: VersionInfo>(

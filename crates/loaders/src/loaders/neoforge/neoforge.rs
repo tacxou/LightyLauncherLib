@@ -376,6 +376,9 @@ pub async fn run_install_processors<V: VersionInfo>(
         });
     }
 
+    // D'abord, télécharger toutes les bibliothèques de l'install_profile
+    patcher::download_install_profile_libraries(version, install_profile).await?;
+
     let installer_url = build_installer_url(version);
     let marker_path = processors_marker_path(version);
     if let Some(expected_sha1) = fetch_maven_sha1(&installer_url).await {
