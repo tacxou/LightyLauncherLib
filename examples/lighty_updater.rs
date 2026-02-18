@@ -20,6 +20,38 @@ async fn main() -> anyhow::Result<()> {
 
     let launcher_dir = AppState::get_project_dirs();
 
+    #[cfg(feature = "events")]
+    let event_bus = EventBus::new(1000);
+
+    #[cfg(feature = "events")]
+    let (instance_exit_tx, instance_exit_rx) = tokio::sync::oneshot::channel::<Option<i32>>();
+
+    #[cfg(feature = "events")] {
+        let mut receiver = event_bus.subscribe();
+        let mut instance_exit_tx = Some(instance_exit_tx);
+
+        tokio::spawn(async move {
+            while let Ok(event) = receiver.next().await {
+                match event {
+                    Event::ConsoleOutput(e) => {
+                        let prefix = match e.stream {
+                            ConsoleStream::Stdout => "[GAME]",
+                            ConsoleStream::Stderr => "[ERR]",
+                        };
+                        println!("{} {}", prefix, e.line);
+                    }
+                    Event::InstanceExited(e) => {
+                        println!("\n⚠ Instance exited with code: {:?}", e.exit_code);
+                        if let Some(tx) = instance_exit_tx.take() {
+                            let _ = tx.send(e.exit_code);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        });
+    }
+
     // Authenticate
     let mut auth = OfflineAuth::new("Hamadi");
     #[cfg(feature = "events")]
@@ -38,9 +70,19 @@ async fn main() -> anyhow::Result<()> {
     trace_info!("LightyUpdater metadata fetched successfully");
 
     // Launch the game
+    #[cfg(feature = "events")]
+    version.launch(&profile, JavaDistribution::Temurin)
+        .with_event_bus(&event_bus)
+        .run()
+        .await?;
+
+    #[cfg(not(feature = "events"))]
     version.launch(&profile, JavaDistribution::Temurin)
         .run()
         .await?;
+
+    #[cfg(feature = "events")]
+    let _ = instance_exit_rx.await;
 
     trace_info!("LightyUpdater launch successful!");
 
