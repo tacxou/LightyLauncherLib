@@ -83,12 +83,6 @@ async fn main() -> anyhow::Result<()> {
             size: Some(2048000),
         },
     ]);
-    
-    // Récupérer les métadonnées normalement
-    // Les mods personnalisés seront automatiquement inclus
-    println!("📦 Récupération des métadonnées...");
-    let metadata = neoforge.get_metadata().await?;
-    println!("✅ Métadonnées récupérées avec mods personnalisés");
 
     // Lancer l'installation et le jeu
     // L'installer téléchargera automatiquement les mods fusionnés
