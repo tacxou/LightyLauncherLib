@@ -1,14 +1,10 @@
 use std::{fmt::Debug,
           path::{Path, PathBuf},
-          sync::Arc
 };
 use once_cell::sync::Lazy;
 use directories::ProjectDirs;
 use lighty_loaders::types::VersionInfo;
-use lighty_loaders::types::version_metadata::{Library, Mods, AssetsFile, VersionMetaData, Version};
-use lighty_loaders::types::Loader;
-use lighty_loaders::types::LoaderExtensions;
-use lighty_loaders::utils::error::QueryError;
+use lighty_loaders::types::version_metadata::{Library, Mods, AssetsFile};
 
 /// Structure principale pour configurer une version Minecraft avec un loader
 ///

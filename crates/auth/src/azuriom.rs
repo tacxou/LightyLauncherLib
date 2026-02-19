@@ -95,6 +95,7 @@ struct AzuriomRole {
     color: Option<String>,
 }
 
+#[allow(dead_code)]
 /// Azuriom API error response
 #[derive(Debug, Deserialize)]
 struct AzuriomErrorResponse {

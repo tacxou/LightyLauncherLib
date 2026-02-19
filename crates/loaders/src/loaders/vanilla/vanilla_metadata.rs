@@ -1,18 +1,21 @@
 use std::collections::HashMap;
 use serde::Deserialize;
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct PistonMetaManifest {
     pub latest: Latest,
     pub versions: Vec<VersionInfo>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct Latest {
     pub release: String,
     pub snapshot: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct VersionInfo {
     pub id: String,

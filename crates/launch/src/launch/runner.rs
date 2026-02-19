@@ -1,8 +1,9 @@
+#[allow(unused_imports)]
 use lighty_java::JreError;
 use lighty_core::time_it;
 use lighty_java::jre_downloader::jre_download;
 use lighty_java::JavaDistribution;
-use lighty_loaders::types::version_metadata::{Version, Library, Native, Client};
+use lighty_loaders::types::version_metadata::{Version};
 use crate::errors::{InstallerError, InstallerResult};
 use crate::installer::Installer;
 use super::builder::LaunchBuilder;
@@ -146,12 +147,12 @@ where
 {
     lighty_core::trace_debug!("[Launch] Fetching metadata for loader: {:?}", builder.loader());
 
-    let loader_name = format!("{:?}", builder.loader());
+    let _loader_name = format!("{:?}", builder.loader());
 
     #[cfg(feature = "events")]
     if let Some(bus) = event_bus {
         bus.emit(lighty_event::Event::Loader(lighty_event::LoaderEvent::FetchingData {
-            loader: loader_name.clone(),
+            loader: _loader_name.clone(),
             minecraft_version: builder.minecraft_version().to_string(),
             loader_version: builder.loader_version().to_string(),
         }));
@@ -163,7 +164,7 @@ where
     #[cfg(feature = "events")]
     if let Some(bus) = event_bus {
         bus.emit(lighty_event::Event::Loader(lighty_event::LoaderEvent::DataFetched {
-            loader: loader_name,
+            loader: _loader_name,
             minecraft_version: builder.minecraft_version().to_string(),
             loader_version: builder.loader_version().to_string(),
         }));
@@ -217,8 +218,8 @@ where
                 builder.java_dirs(),
                 java_distribution,
                 &java_version,
-                |current, total| {
-                    lighty_core::trace_debug!("[Java] Download progress: {}/{}", current, total);
+                |_current, _total| {
+                    lighty_core::trace_debug!("[Java] Download progress: {}/{}", _current, _total);
                 },
                 event_bus,
             ).await.map_err(|e| InstallerError::DownloadFailed(format!("JRE download failed: {}", e)))?;
@@ -228,8 +229,8 @@ where
                 builder.java_dirs(),
                 java_distribution,
                 &java_version,
-                |current, total| {
-                    lighty_core::trace_debug!("[Java] Download progress: {}/{}", current, total);
+                |_current, _total| {
+                    lighty_core::trace_debug!("[Java] Download progress: {}/{}", _current, _total);
                 },
             ).await.map_err(|e : JreError | InstallerError::DownloadFailed(format!("JRE download failed: {}", e)))?;
 
@@ -469,14 +470,14 @@ where
 
             Ok(())
         }
-        Err(e) => {
+        Err(_e) => {
             // Les erreurs de nettoyage ne doivent pas empêcher le lancement
-            lighty_core::trace_warn!("[Launch 3c] Cleanup encountered an error (non-fatal): {}", e);
+            lighty_core::trace_warn!("[Launch 3c] Cleanup encountered an error (non-fatal): {}", _e);
             
             #[cfg(feature = "events")]
             if let Some(bus) = event_bus {
                 bus.emit(lighty_event::Event::Launch(lighty_event::LaunchEvent::FilesCleanupFailed {
-                    reason: format!("{}", e),
+                    reason: format!("{}", _e),
                 }));
             }
 

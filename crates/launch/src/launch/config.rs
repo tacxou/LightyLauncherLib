@@ -53,6 +53,7 @@ impl Default for LaunchConfig {
     }
 }
 
+#[allow(dead_code)]
 static LAUNCH_CONFIG: OnceCell<LaunchConfig> = OnceCell::new();
 
 /// Initialize the global launch configuration
@@ -74,6 +75,7 @@ static LAUNCH_CONFIG: OnceCell<LaunchConfig> = OnceCell::new();
 ///     JavaDistribution::Zulu
 /// ));
 /// ```
+#[allow(dead_code)]
 pub fn init_launch_config(config: LaunchConfig) {
     LAUNCH_CONFIG.set(config).ok();
 }
@@ -81,6 +83,7 @@ pub fn init_launch_config(config: LaunchConfig) {
 /// Get the current launch configuration
 ///
 /// If not initialized via `init_launch_config()`, returns default values.
+#[allow(dead_code)]
 pub(crate) fn get_config() -> LaunchConfig {
     LAUNCH_CONFIG.get_or_init(LaunchConfig::default).clone()
 }

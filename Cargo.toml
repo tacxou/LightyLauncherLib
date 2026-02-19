@@ -7,7 +7,7 @@ members = [
     "crates/launch",
     "crates/loaders",
     "crates/version",
-    "crates/tauri",
+    # "crates/tauri",
 ]
 resolver = "2"
 
@@ -53,7 +53,7 @@ lighty-java = { version = "0.8.6", path = "crates/java" }
 lighty-launch = { version = "0.8.6", path = "crates/launch" }
 lighty-loaders = { version = "0.8.6", path = "crates/loaders" }
 lighty-version = { version = "0.8.6", path = "crates/version" }
-lighty-tauri = { version = "0.8.6", path = "crates/tauri" }
+# lighty-tauri = { version = "0.8.6", path = "crates/tauri" }
 
 # ---- Async Runtime ----
 tokio = { version = "1.48", features = [
@@ -122,8 +122,8 @@ fastrand = "2.3"
 rayon = "1.10"
 
 # ---- Tauri ----
-tauri = { version = "2" }
-tauri-plugin = { version = "2" }
+# tauri = { version = "2" }
+# tauri-plugin = { version = "2" }
 
 # ---- Dev dependencies ----
 tokio-test = "0.4"
@@ -144,7 +144,7 @@ lighty-java = { workspace = true }
 lighty-launch = { workspace = true }
 lighty-loaders = { workspace = true }
 lighty-version = { workspace = true }
-lighty-tauri = { workspace = true, optional = true }
+# lighty-tauri = { workspace = true, optional = true }
 
 # Required for examples
 tokio = { workspace = true }
@@ -180,10 +180,11 @@ lighty_updater = ["lighty-loaders/lighty_updater"]
 all-loaders = ["lighty-loaders/all-loaders"]
 
 # Tauri integration
-tauri-commands = ["lighty-tauri", "lighty-tauri/tauri-commands"]
+# tauri-commands = ["lighty-tauri", "lighty-tauri/tauri-commands"]
 
 # Event system
-events = ["lighty-event", "lighty-auth/events", "lighty-launch/events", "lighty-tauri/events"]
+# "lighty-tauri/events"
+events = ["lighty-event", "lighty-auth/events", "lighty-launch/events"]
 
 # Logging
 tracing = [

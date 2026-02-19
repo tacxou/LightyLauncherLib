@@ -211,8 +211,8 @@ pub async fn install_with_cleanup<T: VersionInfo + Installer>(
                     lighty_core::trace_info!("[Installer] ✓ No unauthorized files found");
                 }
             }
-            Err(e) => {
-                lighty_core::trace_warn!("[Installer] Cleanup encountered an error: {}", e);
+            Err(_e) => {
+                lighty_core::trace_warn!("[Installer] Cleanup encountered an error: {}", _e);
                 // Don't fail the installation if cleanup fails
             }
         }

@@ -224,7 +224,7 @@ impl MicrosoftAuth {
             .await?;
 
         if !response.status().is_success() {
-            let status = response.status();
+            let _status = response.status();
             let error_text = response.text().await?;
 
             // Check for specific error codes
@@ -237,7 +237,7 @@ impl MicrosoftAuth {
                 return Err(AuthError::Custom("Xbox Live is not available in your country".into()));
             }
 
-            lighty_core::trace_error!(status = %status, error = %error_text, "Failed to get XSTS token");
+            lighty_core::trace_error!(status = %_status, error = %error_text, "Failed to get XSTS token");
             return Err(AuthError::InvalidResponse(error_text));
         }
 
@@ -282,9 +282,9 @@ impl MicrosoftAuth {
             .await?;
 
         if !response.status().is_success() {
-            let status = response.status();
+            let _status = response.status();
             let error_text = response.text().await?;
-            lighty_core::trace_error!(status = %status, error = %error_text, "Failed to get Minecraft profile");
+            lighty_core::trace_error!(status = %_status, error = %error_text, "Failed to get Minecraft profile");
             return Err(AuthError::InvalidResponse(error_text));
         }
 
@@ -517,6 +517,7 @@ fn format_uuid(uuid: &str) -> String {
 
 // Response structures
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct DeviceCodeResponse {
     device_code: String,
@@ -526,6 +527,7 @@ struct DeviceCodeResponse {
     interval: u64,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct MicrosoftTokenResponse {
     access_token: String,
@@ -541,6 +543,7 @@ struct XboxTokenResponse {
     display_claims: serde_json::Value,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct MinecraftTokenResponse {
     access_token: String,
@@ -553,6 +556,7 @@ struct MinecraftProfile {
     name: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct OAuthError {
     error: String,

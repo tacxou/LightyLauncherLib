@@ -221,7 +221,7 @@ impl Query for LightyQuery {
         }
 
         // Mods : Si Lighty fournit des mods
-        if let Some(mods) = &full_data.mods {
+        if let Some(_mods) = &full_data.mods {
             builder.mods = Some(extract_mods(full_data));
         }
 
@@ -256,6 +256,7 @@ impl Query for LightyQuery {
 }
 
 /// Extrait le VersionBuilder depuis VersionMetaData
+#[allow(dead_code)]
 pub(crate) fn extract_version_builder(data: std::sync::Arc<VersionMetaData>) -> Result<Version> {
     match data.as_ref() {
         VersionMetaData::Version(builder) => Ok(builder.clone()),

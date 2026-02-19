@@ -25,6 +25,7 @@ pub(crate) async fn handle_console_streams(
 
     // Handler stdout
     if let Some(stdout) = stdout {
+        #[allow(unused_variables)]
         let instance_name = instance_name.clone();
         #[cfg(feature = "events")]
         let event_bus_clone = event_bus.clone();
@@ -33,7 +34,7 @@ pub(crate) async fn handle_console_streams(
             let reader = BufReader::new(stdout);
             let mut lines = reader.lines();
 
-            while let Ok(Some(line)) = lines.next_line().await {
+            while let Ok(Some(_line)) = lines.next_line().await {
                 #[cfg(feature = "events")]
                 {
                     use lighty_event::{ConsoleOutputEvent, ConsoleStream, Event};
@@ -44,7 +45,7 @@ pub(crate) async fn handle_console_streams(
                             pid,
                             instance_name: instance_name.clone(),
                             stream: ConsoleStream::Stdout,
-                            line,
+                            line: _line,
                             timestamp: SystemTime::now(),
                         }));
                     }
@@ -55,6 +56,7 @@ pub(crate) async fn handle_console_streams(
 
     // Handler stderr
     if let Some(stderr) = stderr {
+        #[allow(unused_variables)]
         let instance_name = instance_name.clone();
         #[cfg(feature = "events")]
         let event_bus_clone = event_bus.clone();
@@ -63,7 +65,7 @@ pub(crate) async fn handle_console_streams(
             let reader = BufReader::new(stderr);
             let mut lines = reader.lines();
 
-            while let Ok(Some(line)) = lines.next_line().await {
+            while let Ok(Some(_line)) = lines.next_line().await {
                 #[cfg(feature = "events")]
                 {
                     use lighty_event::{ConsoleOutputEvent, ConsoleStream, Event};
@@ -74,7 +76,7 @@ pub(crate) async fn handle_console_streams(
                             pid,
                             instance_name: instance_name.clone(),
                             stream: ConsoleStream::Stderr,
-                            line,
+                            line: _line,
                             timestamp: SystemTime::now(),
                         }));
                     }
@@ -85,7 +87,7 @@ pub(crate) async fn handle_console_streams(
 
     // Wait for process to exit
     match child.wait().await {
-        Ok(status) => {
+        Ok(_status) => {
             #[cfg(feature = "events")]
             {
                 use lighty_event::{Event, InstanceExitedEvent};
@@ -95,7 +97,7 @@ pub(crate) async fn handle_console_streams(
                     bus.emit(Event::InstanceExited(InstanceExitedEvent {
                         pid,
                         instance_name: instance_name.clone(),
-                        exit_code: status.code(),
+                        exit_code: _status.code(),
                         timestamp: SystemTime::now(),
                     }));
                 }
@@ -104,15 +106,15 @@ pub(crate) async fn handle_console_streams(
             lighty_core::trace_info!(
                 pid = pid,
                 instance = %instance_name,
-                exit_code = ?status.code(),
+                exit_code = ?_status.code(),
                 "Instance exited"
             );
         }
-        Err(e) => {
+        Err(_e) => {
             lighty_core::trace_error!(
                 pid = pid,
                 instance = %instance_name,
-                error = %e,
+                error = %_e,
                 "Error waiting for instance"
             );
         }

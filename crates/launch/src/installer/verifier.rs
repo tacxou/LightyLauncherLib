@@ -14,7 +14,7 @@ use crate::errors::InstallerError;
 /// Verifies if a file exists and matches the expected SHA1 hash
 ///
 /// Returns true if the file needs to be downloaded
-pub async fn needs_download(path: &PathBuf, sha1: Option<&String>, name: &str) -> bool {
+pub async fn needs_download(path: &PathBuf, sha1: Option<&String>, _name: &str) -> bool {
     if !path.exists() {
         return true;
     }
@@ -23,7 +23,7 @@ pub async fn needs_download(path: &PathBuf, sha1: Option<&String>, name: &str) -
         match verify_file_sha1(path, hash).await {
             Ok(true) => false,
             _ => {
-                lighty_core::trace_warn!("[Installer] SHA1 mismatch for {}, re-downloading...", name);
+                lighty_core::trace_warn!("[Installer] SHA1 mismatch for {}, re-downloading...", _name);
                 let _ = fs::remove_file(path).await;
                 true
             }
@@ -48,9 +48,10 @@ pub async fn needs_download(path: &PathBuf, sha1: Option<&String>, name: &str) -
 /// On an 8-core CPU with 150 libraries:
 /// - Sequential verification: ~15s
 /// - Parallel verification: ~2.5s (6x speedup)
+#[allow(dead_code)]
 pub fn verify_files_parallel(files: &[(PathBuf, Option<String>, String)]) -> Vec<bool> {
     files.par_iter()
-        .map(|(path, sha1, name)| {
+        .map(|(path, sha1, _name)| {
             // Check if file exists
             if !path.exists() {
                 return true;
@@ -65,7 +66,7 @@ pub fn verify_files_parallel(files: &[(PathBuf, Option<String>, String)]) -> Vec
             match verify_file_sha1_sync(path, hash) {
                 Ok(true) => false,  // Hash matches, no download needed
                 _ => {
-                    lighty_core::trace_warn!("[Installer] SHA1 mismatch for {}, re-downloading...", name);
+                    lighty_core::trace_warn!("[Installer] SHA1 mismatch for {}, re-downloading...", _name);
                     // Note: We don't delete the file here since we're in a parallel context
                     // The caller should handle deletion if needed
                     true
@@ -364,11 +365,11 @@ async fn cleanup_unauthorized_files_internal(
                                     );
                                     deleted_count += 1;
                                 }
-                                Err(e) => {
+                                Err(_e) => {
                                     lighty_core::trace_error!(
                                         "[Installer] Failed to remove unauthorized file {}: {}",
                                         file_name_str,
-                                        e
+                                        _e
                                     );
                                 }
                             }
@@ -376,8 +377,8 @@ async fn cleanup_unauthorized_files_internal(
                     }
                 }
             }
-            Err(e) => {
-                lighty_core::trace_warn!("[Installer] Failed to read directory {}: {}", current_dir.display(), e);
+            Err(_e) => {
+                lighty_core::trace_warn!("[Installer] Failed to read directory {}: {}", current_dir.display(), _e);
             }
         }
     }

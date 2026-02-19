@@ -119,8 +119,11 @@ pub trait InstanceControl: VersionInfo {
     ///     println!("Instance closed");
     /// }
     /// ```
-    async fn close_instance(&self, pid: u32) -> InstanceResult<()> {
-        INSTANCE_MANAGER.close_instance(pid).await
+    fn close_instance(
+        &self,
+        pid: u32,
+    ) -> impl std::future::Future<Output = InstanceResult<()>> + '_ {
+        async move { INSTANCE_MANAGER.close_instance(pid).await }
     }
 
     /// Delete the instance completely from disk
@@ -150,33 +153,35 @@ pub trait InstanceControl: VersionInfo {
     /// instance.delete_instance().await?;
     /// println!("Instance deleted");
     /// ```
-    async fn delete_instance(&self) -> InstanceResult<()> {
-        // Check that no instances are running
-        let running_pids = self.get_pids();
-        if !running_pids.is_empty() {
-            return Err(InstanceError::StillRunning {
-                instance_name: self.name().to_string(),
-                pids: running_pids,
-            });
+    fn delete_instance(&self) -> impl std::future::Future<Output = InstanceResult<()>> + '_ {
+        async move {
+            // Check that no instances are running
+            let running_pids = self.get_pids();
+            if !running_pids.is_empty() {
+                return Err(InstanceError::StillRunning {
+                    instance_name: self.name().to_string(),
+                    pids: running_pids,
+                });
+            }
+
+            // Complete deletion
+            tokio::fs::remove_dir_all(self.game_dirs()).await?;
+
+            // Emit event
+            #[cfg(feature = "events")]
+            {
+                use lighty_event::{Event, InstanceDeletedEvent, EVENT_BUS};
+                use std::time::SystemTime;
+
+                EVENT_BUS.emit(Event::InstanceDeleted(InstanceDeletedEvent {
+                    instance_name: self.name().to_string(),
+                    timestamp: SystemTime::now(),
+                }));
+            }
+
+            lighty_core::trace_info!(instance = %self.name(), "Instance deleted");
+            Ok(())
         }
-
-        // Complete deletion
-        tokio::fs::remove_dir_all(self.game_dirs()).await?;
-
-        // Emit event
-        #[cfg(feature = "events")]
-        {
-            use lighty_event::{Event, InstanceDeletedEvent, EVENT_BUS};
-            use std::time::SystemTime;
-
-            EVENT_BUS.emit(Event::InstanceDeleted(InstanceDeletedEvent {
-                instance_name: self.name().to_string(),
-                timestamp: SystemTime::now(),
-            }));
-        }
-
-        lighty_core::trace_info!(instance = %self.name(), "Instance deleted");
-        Ok(())
     }
 
     /// Calculate instance size from Version metadata

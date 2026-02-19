@@ -1,10 +1,15 @@
 use crate::types::version_metadata::VersionMetaData;
 use crate::types::{Loader, VersionInfo};
 use crate::utils::error::QueryError;
+#[allow(unused_imports)]
 use crate::loaders::lighty_updater::lighty_updater::{LIGHTY_UPDATER, LightyQuery};
+#[allow(unused_imports)]
 use crate::loaders::neoforge::neoforge::{NeoForgeQuery, NEOFORGE};
+#[allow(unused_imports)]
 use crate::loaders::quilt::quilt::{QuiltQuery, QUILT};
+#[allow(unused_imports)]
 use crate::loaders::fabric::fabric::{FabricQuery, FABRIC};
+#[allow(unused_imports)]
 use crate::loaders::vanilla::vanilla::{VanillaQuery, VANILLA};
 use async_trait::async_trait;
 use std::sync::Arc;

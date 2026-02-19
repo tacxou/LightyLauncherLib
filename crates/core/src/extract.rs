@@ -165,7 +165,7 @@ where
 
     // Manual extraction with validation
     let mut entries = ar.entries()?;
-    let mut files_extracted = 0usize;
+    let mut _files_extracted = 0usize;
 
     while let Some(entry) = entries.next().await {
         let mut entry = entry?;
@@ -201,14 +201,14 @@ where
         // Extract safely
         entry.unpack(&dest).await?;
 
-        files_extracted += 1;
+        _files_extracted += 1;
 
         // Emit progress event every 10 files
         #[cfg(feature = "events")]
         if let Some(bus) = event_bus {
-            if files_extracted % 10 == 0 {
+            if _files_extracted % 10 == 0 {
                 bus.emit(Event::Core(CoreEvent::ExtractionProgress {
-                    files_extracted,
+                    files_extracted: _files_extracted,
                     total_files: 0, // Unknown for tar.gz
                 }));
             }
@@ -219,7 +219,7 @@ where
     if let Some(bus) = event_bus {
         bus.emit(Event::Core(CoreEvent::ExtractionCompleted {
             archive_type: "TAR.GZ".to_string(),
-            files_extracted,
+            files_extracted: _files_extracted,
         }));
     }
 

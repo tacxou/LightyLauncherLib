@@ -3,11 +3,12 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::RwLock;
 use std::time::SystemTime;
-use tokio::process::Child;
+// use tokio::process::Child;
 
 use super::errors::{InstanceError, InstanceResult};
 
 /// Internal representation of a running game instance
+#[allow(dead_code)]
 pub(crate) struct GameInstance {
     /// Process ID
     pub pid: u32,
@@ -76,7 +77,7 @@ impl InstanceManager {
     /// The instance will be unregistered automatically by the console handler.
     pub async fn close_instance(&self, pid: u32) -> InstanceResult<()> {
         let mut instances = self.instances.write().unwrap();
-        let instance = instances
+        let _instance = instances
             .remove(&pid)
             .ok_or(InstanceError::NotFound { pid })?;
 
@@ -119,6 +120,7 @@ impl InstanceManager {
         Ok(())
     }
 
+    #[allow(dead_code)]
     /// Check if there are any running instances
     pub fn has_running_instances(&self) -> bool {
         let instances = self.instances.read().unwrap();

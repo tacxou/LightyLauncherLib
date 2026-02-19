@@ -8,6 +8,7 @@ pub struct ServersResponse {
 
 impl ServersResponse {
     /// Retourne la liste des serveurs disponibles
+    #[allow(dead_code)]
     pub fn servers(&self) -> &[ServerInfo] {
         &self.servers
     }
