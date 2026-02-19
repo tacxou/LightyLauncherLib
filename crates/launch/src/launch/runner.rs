@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use lighty_loaders::types::version_metadata::VersionMetaData;
 use lighty_java::jre_downloader::find_java_binary;
 use lighty_java::runtime::JavaRuntime;
-use crate::arguments::Arguments;
+use crate::arguments::{Arguments, KEY_AUTH_ACCESS_TOKEN, KEY_USER_TYPE};
 use std::collections::{HashMap,HashSet};
 use crate::installer::{cleanup_game_directories, create_files_allowlist};
 
@@ -78,8 +78,6 @@ pub(crate) async fn execute_launch<T>(
 where
     T: VersionInfo<LoaderType = Loader> + LoaderExtensions + Arguments + Installer,
 {
-        let username = &profile.username;
-        let uuid = &profile.uuid;
         // 1. Préparer les métadonnées du loader
         let metadata = prepare_metadata(
             version,
@@ -126,8 +124,7 @@ where
         execute_game(
             version,
             version_data,
-            username,
-            uuid,
+            profile,
             java_path,
             arg_overrides,
             arg_removals,
@@ -246,8 +243,7 @@ where
 async fn execute_game<T>(
     builder: &T,
     version: &Version,
-    username: &str,
-    uuid: &str,
+    profile: &UserProfile,
     java_path: PathBuf,
     arg_overrides: &HashMap<String, String>,
     arg_removals: &HashSet<String>,
@@ -262,8 +258,30 @@ where
     use crate::instance::{handle_console_streams, INSTANCE_MANAGER};
     use crate::instance::manager::GameInstance;
 
+    let username = &profile.username;
+    let uuid = &profile.uuid;
+
+    let mut merged_arg_overrides = arg_overrides.clone();
+    if let Some(token) = profile.access_token.as_ref() {
+        merged_arg_overrides
+            .entry(KEY_AUTH_ACCESS_TOKEN.into())
+            .or_insert_with(|| token.clone());
+        merged_arg_overrides
+            .entry(KEY_USER_TYPE.into())
+            .or_insert_with(|| "msa".to_string());
+    }
+
     // Construire les arguments
-    let arguments = builder.build_arguments(version, username, uuid, arg_overrides, arg_removals, jvm_overrides, jvm_removals, raw_args);
+    let arguments = builder.build_arguments(
+        version,
+        username,
+        uuid,
+        &merged_arg_overrides,
+        arg_removals,
+        jvm_overrides,
+        jvm_removals,
+        raw_args,
+    );
 
     // Créer JavaRuntime avec le chemin vers java.exe
     let java_runtime = JavaRuntime::new(java_path);

@@ -237,6 +237,10 @@ name = "vanilla"
 required-features = ["vanilla", "tracing"]
 
 [[example]]
+name = "vanilla_with_auth"
+required-features = ["vanilla", "tracing"]
+
+[[example]]
 name = "fabric"
 required-features = ["fabric","events", "tracing"]
 
