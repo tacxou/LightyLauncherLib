@@ -621,12 +621,78 @@ pub async fn refresh_microsoft_access_token(profile: &UserProfile, client_id: &s
             return Err(AuthError::InvalidResponse(error_text));
         }
         let token: crate::microsoft::MicrosoftTokenResponse = response.json().await?;
+
+        // Maintenant échanger le Microsoft token -> Xbox -> XSTS -> Minecraft
+        // 1) Xbox token
+        let xbox_resp = CLIENT
+            .post(XBOX_AUTH_URL)
+            .json(&serde_json::json!({
+                "Properties": {
+                    "AuthMethod": "RPS",
+                    "SiteName": "user.auth.xboxlive.com",
+                    "RpsTicket": format!("d={}", token.access_token)
+                },
+                "RelyingParty": "http://auth.xboxlive.com",
+                "TokenType": "JWT"
+            }))
+            .send()
+            .await?;
+        if !xbox_resp.status().is_success() {
+            let error_text = xbox_resp.text().await?;
+            return Err(AuthError::InvalidResponse(error_text));
+        }
+        let xbox_token: XboxTokenResponse = xbox_resp.json().await?;
+
+        // 2) XSTS token
+        let xsts_resp = CLIENT
+            .post(XSTS_AUTH_URL)
+            .json(&serde_json::json!({
+                "Properties": {
+                    "SandboxId": "RETAIL",
+                    "UserTokens": [xbox_token.token]
+                },
+                "RelyingParty": "rp://api.minecraftservices.com/",
+                "TokenType": "JWT"
+            }))
+            .send()
+            .await?;
+        if !xsts_resp.status().is_success() {
+            let error_text = xsts_resp.text().await?;
+            return Err(AuthError::InvalidResponse(error_text));
+        }
+        let xsts_token: XboxTokenResponse = xsts_resp.json().await?;
+
+        // Extraire UHS
+        let uhs = xsts_token
+            .display_claims
+            .get("xui")
+            .and_then(|xui| xui.get(0))
+            .and_then(|user| user.get("uhs"))
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| AuthError::InvalidResponse("Missing UHS in XSTS token".into()))?;
+
+        // 3) Minecraft token via MC_AUTH_URL
+        let mc_resp = CLIENT
+            .post(MC_AUTH_URL)
+            .json(&serde_json::json!({
+                "identityToken": format!("XBL3.0 x={};{}", uhs, xsts_token.token)
+            }))
+            .send()
+            .await?;
+        if !mc_resp.status().is_success() {
+            let error_text = mc_resp.text().await?;
+            return Err(AuthError::InvalidResponse(error_text));
+        }
+        let mc_token: MinecraftTokenResponse = mc_resp.json().await?;
+
         let mut new_profile = profile.clone();
-        new_profile.access_token = Some(token.access_token);
+        // Met à jour avec le token Minecraft (utilisé pour l'authentification MC)
+        new_profile.access_token = Some(mc_token.access_token);
+        // Garde le refresh_token Microsoft si présent
         new_profile.refresh_token = token.refresh_token;
         // Met à jour la date d'émission et le temps d'expiration
         new_profile.emited_at = Some(chrono::Utc::now());
-        new_profile.expires_in = token.expires_in;
+        new_profile.expires_in = mc_token.expires_in;
         Ok(new_profile)
     } else {
         Err(AuthError::Custom("No refresh_token available".into()))
