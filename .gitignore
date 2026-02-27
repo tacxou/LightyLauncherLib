@@ -16,5 +16,8 @@
 !Cargo.lock
 !.gitignore
 
+# Ignore le profil de test Microsoft
+examples/test_microsoft_profile.json
+
 
 
