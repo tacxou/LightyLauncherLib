@@ -1,20 +1,20 @@
 // Copyright (c) 2025 Hamadi
 // Licensed under the MIT License
 
-//! Microsoft OAuth 2.0 authentication for Minecraft
-//!
-//! Implements the Device Code Flow for authenticating Minecraft accounts via Microsoft.
-//! This is a multi-step process:
-//! 1. Request a device code
-//! 2. User authorizes via browser
-//! 3. Poll for token
-//! 4. Exchange for Xbox Live token
-//! 5. Exchange for XSTS token
-//! 6. Exchange for Minecraft token
-//! 7. Fetch Minecraft profile
+// Microsoft OAuth 2.0 authentication for Minecraft
+//
+// Implements the Device Code Flow for authenticating Minecraft accounts via Microsoft.
+// This is a multi-step process:
+// 1. Request a device code
+// 2. User authorizes via browser
+// 3. Poll for token
+// 4. Exchange for Xbox Live token
+// 5. Exchange for XSTS token
+// 6. Exchange for Minecraft token
+// 7. Fetch Minecraft profile
 
-use crate::{Authenticator, AuthError, AuthResult, UserProfile};
-use lighty_core::hosts::HTTP_CLIENT as CLIENT;
+use crate::Authenticator;
+pub(crate) use lighty_core::hosts::HTTP_CLIENT as CLIENT;
 use serde::Deserialize;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -22,7 +22,7 @@ use tokio::time::sleep;
 #[cfg(feature = "events")]
 use lighty_event::{EventBus, Event, AuthEvent};
 
-const MS_AUTH_URL: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0";
+pub(crate) const MS_AUTH_URL: &str = "https://login.microsoftonline.com/consumers/oauth2/v2.0";
 const XBOX_AUTH_URL: &str = "https://user.auth.xboxlive.com/user/authenticate";
 const XSTS_AUTH_URL: &str = "https://xsts.auth.xboxlive.com/xsts/authorize";
 const MC_AUTH_URL: &str = "https://api.minecraftservices.com/authentication/login_with_xbox";
@@ -485,16 +485,22 @@ impl Authenticator for MicrosoftAuth {
             }));
         }
 
+        // Ajout de emited_at avec la date de la requête
         Ok(UserProfile {
+            provider: crate::AuthProvider::Microsoft { client_id: self.client_id.clone() },
+            refresh_impl: Some(std::sync::Arc::new(MicrosoftRefresh)),
             id: None,
             username: mc_profile.name,
             uuid,
             access_token: Some(mc_token.access_token),
+            refresh_token: ms_token.refresh_token,
             email: None,
             email_verified: true,
             money: None,
             role: None,
             banned: false,
+            expires_in: ms_token.expires_in,
+            emited_at: Some(chrono::Utc::now()),
         })
     }
 }
@@ -529,10 +535,10 @@ struct DeviceCodeResponse {
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
-struct MicrosoftTokenResponse {
-    access_token: String,
-    refresh_token: Option<String>,
-    expires_in: u64,
+pub struct MicrosoftTokenResponse {
+    pub access_token: String,
+    pub refresh_token: Option<String>,
+    pub expires_in: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -561,4 +567,68 @@ struct MinecraftProfile {
 struct OAuthError {
     error: String,
     error_description: Option<String>,
+}
+
+use crate::auth::{UserProfile, TokenRefreshable, AuthResult};
+
+pub struct MicrosoftRefresh;
+
+#[async_trait::async_trait]
+impl TokenRefreshable for MicrosoftRefresh {
+    async fn refresh_access_token(&self, profile: &UserProfile) -> crate::AuthResult<UserProfile> {
+        let client_id = match &profile.provider {
+            crate::AuthProvider::Microsoft { client_id } => client_id,
+            _ => return Err(crate::AuthError::Custom("Not a Microsoft profile".into())),
+        };
+        refresh_microsoft_access_token(profile, client_id).await
+    }
+}
+
+#[async_trait::async_trait]
+pub trait TokenRefreshableProvider: Send + Sync {
+    async fn refresh_access_token(&self, profile: &UserProfile) -> AuthResult<UserProfile>;
+}
+
+pub struct MicrosoftRefreshProvider;
+
+#[async_trait::async_trait]
+impl TokenRefreshableProvider for MicrosoftRefreshProvider {
+    async fn refresh_access_token(&self, profile: &UserProfile) -> AuthResult<UserProfile> {
+        let client_id = match &profile.provider {
+            crate::AuthProvider::Microsoft { client_id } => client_id,
+            _ => return Err(crate::AuthError::Custom("Not a Microsoft profile".into())),
+        };
+        refresh_microsoft_access_token(profile, client_id).await
+    }
+}
+use crate::AuthError;
+/// Rafraîchit le token Microsoft à partir d'un UserProfile
+pub async fn refresh_microsoft_access_token(profile: &UserProfile, client_id: &str) -> AuthResult<UserProfile> {
+    use crate::microsoft::{CLIENT, MS_AUTH_URL};
+    if let Some(refresh_token) = &profile.refresh_token {
+        let response = CLIENT
+            .post(&format!("{}/token", MS_AUTH_URL))
+            .form(&[
+                ("grant_type", "refresh_token"),
+                ("client_id", client_id),
+                ("refresh_token", refresh_token),
+                ("scope", "XboxLive.signin offline_access"),
+            ])
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            let error_text = response.text().await?;
+            return Err(AuthError::InvalidResponse(error_text));
+        }
+        let token: crate::microsoft::MicrosoftTokenResponse = response.json().await?;
+        let mut new_profile = profile.clone();
+        new_profile.access_token = Some(token.access_token);
+        new_profile.refresh_token = token.refresh_token;
+        // Met à jour la date d'émission et le temps d'expiration
+        new_profile.emited_at = Some(chrono::Utc::now());
+        new_profile.expires_in = token.expires_in;
+        Ok(new_profile)
+    } else {
+        Err(AuthError::Custom("No refresh_token available".into()))
+    }
 }

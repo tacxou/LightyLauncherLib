@@ -1,12 +1,13 @@
 // Copyright (c) 2025 Hamadi
 // Licensed under the MIT License
 
-//! Offline authentication - no network required
-//!
-//! Generates a deterministic UUID v5 (SHA1-based) from the username.
-//! No token validation or verification.
+// Offline authentication - no network required
+//
+// Generates a deterministic UUID v5 (SHA1-based) from the username.
+// No token validation or verification.
 
-use crate::{Authenticator, AuthError, AuthResult, UserProfile, generate_offline_uuid};
+use std::sync::Arc;
+use crate::{Authenticator, AuthError, AuthResult, UserProfile, generate_offline_uuid, auth::TokenRefreshable};
 
 #[cfg(feature = "events")]
 use lighty_event::{EventBus, Event, AuthEvent};
@@ -115,16 +116,30 @@ impl Authenticator for OfflineAuth {
             }));
         }
 
-        Ok(UserProfile {
-            id: None,
-            username: self.username.clone(),
-            uuid,
-            access_token: None,
-            email: None,
-            email_verified: false,
-            money: None,
-            role: None,
-            banned: false,
-        })
+            Ok(UserProfile {
+                    provider: crate::AuthProvider::Offline,
+                    refresh_impl: Some(Arc::new(OfflineRefresh)),
+                id: None,
+                username: self.username.clone(),
+                uuid,
+                access_token: None,
+                refresh_token: None,
+                email: None,
+                email_verified: false,
+                money: None,
+                role: None,
+                banned: false,
+                expires_in: 0,
+                emited_at: Some(chrono::Utc::now()),
+            })
+    }
+}
+
+pub struct OfflineRefresh;
+
+#[async_trait::async_trait]
+impl TokenRefreshable for OfflineRefresh {
+    async fn refresh_access_token(&self, profile: &UserProfile) -> AuthResult<UserProfile> {
+        Ok(profile.clone())
     }
 }

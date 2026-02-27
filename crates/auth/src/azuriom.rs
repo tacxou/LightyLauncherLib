@@ -1,17 +1,18 @@
 // Copyright (c) 2025 Hamadi
 // Licensed under the MIT License
 
-//! Azuriom CMS authentication
-//!
-//! Supports authentication via the Azuriom API with:
-//! - Email/password login
-//! - Two-factor authentication (2FA)
-//! - Token verification
-//! - Logout
+// Azuriom CMS authentication
+//
+// Supports authentication via the Azuriom API with:
+// - Email/password login
+// - Two-factor authentication (2FA)
+// - Token verification
+// - Logout
 
 use crate::{Authenticator, AuthError, AuthResult, UserProfile, UserRole};
 use lighty_core::hosts::HTTP_CLIENT as CLIENT;
 use serde::Deserialize;
+use std::sync::Arc;
 
 #[cfg(feature = "events")]
 use lighty_event::{EventBus, Event, AuthEvent};
@@ -172,20 +173,25 @@ impl Authenticator for AzuriomAuth {
                 }));
             }
 
-            Ok(UserProfile {
-                id: Some(azuriom_response.id),
-                username: azuriom_response.username,
-                uuid: azuriom_response.uuid,
-                access_token: Some(azuriom_response.access_token),
-                email: Some(self.email.clone()),
-                email_verified: azuriom_response.email_verified.unwrap_or(true),
-                money: azuriom_response.money,
-                role: azuriom_response.role.map(|r| UserRole {
-                    name: r.name,
-                    color: r.color,
-                }),
-                banned: azuriom_response.banned.unwrap_or(false),
-            })
+                Ok(UserProfile {
+                    provider: crate::AuthProvider::Azuriom { base_url: self.base_url.clone() },
+                        refresh_impl: Some(Arc::new(AzuriomRefresh)),
+                    id: None,
+                    username: azuriom_response.username.clone(),
+                    uuid: azuriom_response.uuid,
+                    access_token: Some(azuriom_response.access_token),
+                    refresh_token: None,
+                    email: Some(self.email.clone()),
+                    email_verified: azuriom_response.email_verified.unwrap_or(true),
+                    money: azuriom_response.money,
+                    role: azuriom_response.role.map(|r| UserRole {
+                        name: r.name,
+                        color: r.color,
+                    }),
+                    banned: azuriom_response.banned.unwrap_or(false),
+                    expires_in: 0,
+                    emited_at: Some(chrono::Utc::now()),
+                })
         } else {
             // Parse error response
             let error_response: AzuriomErrorResponse = serde_json::from_str(&response_text)
@@ -237,10 +243,13 @@ impl Authenticator for AzuriomAuth {
             lighty_core::trace_info!(username = %azuriom_response.username, "Token verified successfully");
 
             Ok(UserProfile {
+                provider: crate::AuthProvider::Azuriom { base_url: self.base_url.clone() },
+                refresh_impl: Some(Arc::new(AzuriomRefresh)),
                 id: Some(azuriom_response.id),
                 username: azuriom_response.username,
                 uuid: azuriom_response.uuid,
                 access_token: Some(azuriom_response.access_token),
+                refresh_token: None,
                 email: None, // Not returned by verify endpoint
                 email_verified: azuriom_response.email_verified.unwrap_or(true),
                 money: azuriom_response.money,
@@ -249,6 +258,8 @@ impl Authenticator for AzuriomAuth {
                     color: r.color,
                 }),
                 banned: azuriom_response.banned.unwrap_or(false),
+                expires_in: 0,
+                emited_at: Some(chrono::Utc::now()),
             })
         } else {
             lighty_core::trace_error!(status = %status, "Token verification failed");
@@ -278,4 +289,11 @@ impl Authenticator for AzuriomAuth {
     }
 }
 
+pub struct AzuriomRefresh;
 
+#[async_trait::async_trait]
+impl crate::auth::TokenRefreshable for AzuriomRefresh {
+    async fn refresh_access_token(&self, profile: &crate::auth::UserProfile) -> crate::auth::AuthResult<crate::auth::UserProfile> {
+        Ok(profile.clone())
+    }
+}

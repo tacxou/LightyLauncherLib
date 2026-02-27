@@ -1,4 +1,6 @@
+use chrono;
 use std::future::Future;
+use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use crate::AuthError;
 
@@ -7,8 +9,14 @@ use lighty_event::EventBus;
 
 pub type AuthResult<T> = Result<T, AuthError>;
 
+/// Trait pour le rafraîchissement du token selon le mode d'authentification
+#[async_trait::async_trait]
+pub trait TokenRefreshable {
+    async fn refresh_access_token(&self, profile: &UserProfile) -> AuthResult<UserProfile>;
+}
+
 /// User profile returned after successful authentication
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct UserProfile {
     /// User ID (optional for offline mode)
     pub id: Option<u64>,
@@ -21,6 +29,9 @@ pub struct UserProfile {
 
     /// Access token for session validation
     pub access_token: Option<String>,
+
+    /// Refresh token for OAuth
+    pub refresh_token: Option<String>,
 
     /// User email (optional)
     pub email: Option<String>,
@@ -36,6 +47,20 @@ pub struct UserProfile {
 
     /// Whether the account is banned
     pub banned: bool,
+
+    /// Timestamp d'expiration du token (en secondes depuis epoch)
+    pub expires_in: u64,
+
+    /// Authentication provider
+    pub provider: AuthProvider,
+
+    /// Implémentation dynamique du refresh (totalement ignorée par Serde)
+    #[serde(skip_serializing, skip_deserializing, default)]
+    #[doc(hidden)]
+    pub refresh_impl: Option<Arc<dyn TokenRefreshable + Send + Sync>>,
+
+    /// Date et heure d'émission du profil (UTC)
+    pub emited_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 /// User role/rank information
@@ -49,7 +74,7 @@ pub struct UserRole {
 }
 
 /// Authentication provider type
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AuthProvider {
     /// Offline mode - no authentication
     Offline,
@@ -150,4 +175,25 @@ pub fn generate_offline_uuid(username: &str) -> String {
         (hash[8] & 0x3f) | 0x80, hash[9],
         hash[10], hash[11], hash[12], hash[13], hash[14], hash[15]
     )
+}
+
+impl Clone for UserProfile {
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id,
+            username: self.username.clone(),
+            uuid: self.uuid.clone(),
+            access_token: self.access_token.clone(),
+            refresh_token: self.refresh_token.clone(),
+            email: self.email.clone(),
+            email_verified: self.email_verified,
+            money: self.money,
+            role: self.role.clone(),
+            banned: self.banned,
+            provider: self.provider.clone(),
+            refresh_impl: self.refresh_impl.clone(),
+            expires_in: self.expires_in,
+            emited_at: self.emited_at,
+        }
+    }
 }

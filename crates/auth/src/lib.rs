@@ -62,7 +62,8 @@
 //! println!("UUID: {}", uuid); // Always the same for this username
 //! ```
 
-mod auth;
+pub mod auth;
+pub use auth::TokenRefreshable;
 mod errors;
 
 pub mod offline;
