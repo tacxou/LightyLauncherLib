@@ -1,7 +1,6 @@
 use lighty_auth::{UserProfile, microsoft::MicrosoftAuth, Authenticator, AuthProvider};
 use std::{fs, thread::sleep};
 
-
 #[tokio::main]
 async fn main() {
     // Tente de charger un UserProfile Microsoft depuis un fichier JSON de test
