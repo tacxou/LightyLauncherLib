@@ -27,6 +27,8 @@ pub struct ProcessorContext {
     pub data: HashMap<String, String>,
     /// Side (client ou server)
     pub side: String,
+    /// Chemin de l'exécutable Java à utiliser pour les processors
+    pub java_path: PathBuf,
 }
 
 impl ProcessorContext {
@@ -34,6 +36,7 @@ impl ProcessorContext {
     pub fn new<V: VersionInfo>(
         version: &V,
         installer_path: PathBuf,
+        java_path: PathBuf,
         metadata: &NeoForgeMetaData,
     ) -> Self {
         let side = "client".to_string();
@@ -78,6 +81,7 @@ impl ProcessorContext {
             installer_path,
             data,
             side,
+            java_path,
         }
     }
 
@@ -316,8 +320,9 @@ pub async fn run_processors<V: VersionInfo>(
     version: &V,
     metadata: &NeoForgeMetaData,
     installer_path: PathBuf,
+    java_path: PathBuf,
 ) -> Result<()> {
-    let context = ProcessorContext::new(version, installer_path, metadata);
+    let context = ProcessorContext::new(version, installer_path, java_path, metadata);
 
     lighty_core::trace_info!(loader = "neoforge", "Starting processor execution");
 
@@ -448,7 +453,7 @@ async fn execute_processor(context: &ProcessorContext, processor: &Processor) ->
 
     // 5. Exécuter le processor avec Java
     // TODO: Intégrer avec le système Java de lighty_launcher
-    let output = tokio::process::Command::new("java")
+    let output = tokio::process::Command::new(&context.java_path)
         .arg("-cp")
         .arg(&classpath)
         .arg(&main_class)

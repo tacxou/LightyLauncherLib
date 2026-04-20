@@ -380,6 +380,7 @@ async fn verify_installer_sha1(installer_path: &PathBuf, installer_url: &str) ->
 pub async fn run_install_processors<V: VersionInfo>(
     version: &V,
     install_profile: &NeoForgeMetaData,
+    java_path: PathBuf,
 ) -> Result<()> {
     lighty_core::trace_info!(loader = "neoforge", "Checking if processors need to run");
 
@@ -403,7 +404,7 @@ pub async fn run_install_processors<V: VersionInfo>(
     }
 
     // Exécuter les processors
-    patcher::run_processors(version, install_profile, installer_path).await?;
+    patcher::run_processors(version, install_profile, installer_path, java_path).await?;
     
     if let Some(expected_sha1) = fetch_maven_sha1(&installer_url).await {
         if let Err(_err) = std::fs::write(&marker_path, expected_sha1) {

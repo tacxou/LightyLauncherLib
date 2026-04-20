@@ -110,7 +110,7 @@ where
         #[cfg(feature = "neoforge")]
         if matches!(version.loader(), Loader::NeoForge) {
             let install_profile = NEOFORGE.get_raw(version).await?;
-            run_install_processors(version, install_profile.as_ref()).await?;
+            run_install_processors(version, install_profile.as_ref(), java_path.clone()).await?;
         }
 
         //3c. Nettoyage automatique des fichiers non autorisés basé sur les métadonnées
