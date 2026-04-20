@@ -43,47 +43,7 @@ impl Query for NeoForgeQuery {
 
         lighty_core::trace_debug!(url = %installer_url, loader = "neoforge", "Installer URL constructed");
 
-        let profiles_dir = version.game_dirs().join(".neoforge");
-        mkdir!(profiles_dir);
-
-        let installer_path = profiles_dir.join(format!("neoforge-{}-installer.jar", version.loader_version()));
-
-        // Vérifier et télécharger l'installer si nécessaire
-        let needs_download = if installer_path.exists() {
-            match verify_installer_sha1(&installer_path, &installer_url).await {
-                Ok(true) => {
-                    lighty_core::trace_info!(loader = "neoforge", "Installer already exists and SHA1 is valid");
-                    false
-                }
-                Ok(false) => {
-                    lighty_core::trace_warn!(loader = "neoforge", "Installer exists but SHA1 mismatch, re-downloading");
-                    true
-                }
-                Err(_e) => {
-                    lighty_core::trace_warn!(error = %_e, loader = "neoforge", "Could not verify SHA1, using existing file");
-                    false
-                }
-            }
-        } else {
-            true
-        };
-
-        if needs_download {
-            lighty_core::trace_info!(path = ?installer_path, loader = "neoforge", "Downloading installer");
-            download_file_untracked(&installer_url, &installer_path)
-                .await
-                .map_err(|e| QueryError::Conversion {
-                    message: format!("Failed to download installer: {}", e)
-                })?;
-
-            if let Ok(valid) = verify_installer_sha1(&installer_path, &installer_url).await {
-                if !valid {
-                    return Err(QueryError::Conversion {
-                        message: "Downloaded installer has invalid SHA1".to_string()
-                    });
-                }
-            }
-        }
+        let installer_path = ensure_installer_jar(version).await?;
 
         // Lire les JSONs directement depuis le JAR
         let (install_profile, _) = read_jsons_from_jar(&installer_path).await?;
@@ -112,8 +72,7 @@ impl Query for NeoForgeQuery {
                 VanillaQuery::version_builder(version, &vanilla_data).await
             },
             async {
-                let profiles_dir = version.game_dirs().join(".neoforge");
-                let installer_path = profiles_dir.join(format!("neoforge-{}-installer.jar", version.loader_version()));
+                let installer_path = ensure_installer_jar(version).await?;
                 let (_, version_meta) = read_jsons_from_jar(&installer_path).await?;
                 Ok::<_, QueryError>(version_meta)
             }
@@ -345,6 +304,63 @@ async fn fetch_maven_sha1(jar_url: &str) -> Option<String> {
     }
 }
 
+fn installer_path<V: VersionInfo>(version: &V) -> PathBuf {
+    version
+        .game_dirs()
+        .join(".neoforge")
+        .join(format!(
+            "neoforge-{}-installer.jar",
+            version.loader_version()
+        ))
+}
+
+async fn ensure_installer_jar<V: VersionInfo>(version: &V) -> Result<PathBuf> {
+    let installer_url = build_installer_url(version);
+    let profiles_dir = version.game_dirs().join(".neoforge");
+    mkdir!(profiles_dir);
+    let installer_path = installer_path(version);
+
+    let needs_download = if installer_path.exists() {
+        match verify_installer_sha1(&installer_path, &installer_url).await {
+            Ok(true) => false,
+            Ok(false) => true,
+            Err(_e) => {
+                lighty_core::trace_warn!(
+                    error = %_e,
+                    loader = "neoforge",
+                    "Could not verify installer SHA1, using existing file"
+                );
+                false
+            }
+        }
+    } else {
+        true
+    };
+
+    if needs_download {
+        lighty_core::trace_info!(
+            path = ?installer_path,
+            loader = "neoforge",
+            "Downloading installer"
+        );
+        download_file_untracked(&installer_url, &installer_path)
+            .await
+            .map_err(|e| QueryError::Conversion {
+                message: format!("Failed to download installer: {}", e)
+            })?;
+
+        if let Ok(valid) = verify_installer_sha1(&installer_path, &installer_url).await {
+            if !valid {
+                return Err(QueryError::Conversion {
+                    message: "Downloaded installer has invalid SHA1".to_string()
+                });
+            }
+        }
+    }
+
+    Ok(installer_path)
+}
+
 /// Vérifie le SHA1 de l'installer
 async fn verify_installer_sha1(installer_path: &PathBuf, installer_url: &str) -> Result<bool> {
     let expected_sha1 = fetch_maven_sha1(installer_url)
@@ -367,18 +383,7 @@ pub async fn run_install_processors<V: VersionInfo>(
 ) -> Result<()> {
     lighty_core::trace_info!(loader = "neoforge", "Checking if processors need to run");
 
-    let profiles_dir = version.game_dirs().join(".neoforge");
-    mkdir!(profiles_dir);
-    let installer_path = profiles_dir.join(format!(
-        "neoforge-{}-installer.jar",
-        version.loader_version(),
-    ));
-
-    if !installer_path.exists() {
-        return Err(QueryError::Conversion {
-            message: "Installer JAR not found. Run fetch_full_data first.".to_string(),
-        });
-    }
+    let installer_path = ensure_installer_jar(version).await?;
 
     // D'abord, télécharger toutes les bibliothèques de l'install_profile
     patcher::download_install_profile_libraries(version, install_profile).await?;
