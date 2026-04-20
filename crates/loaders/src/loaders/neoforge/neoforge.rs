@@ -127,6 +127,7 @@ impl Query for NeoForgeQuery {
         let merged_libs = merge_libraries(vanilla_builder.libraries, version_json_libs);
 
         // Merger directly with Vanilla taking priority
+        let custom_files = version.get_custom_files().cloned();
         let custom_mods = version.get_custom_mods().cloned();
         
         Ok(Version {
@@ -135,6 +136,7 @@ impl Query for NeoForgeQuery {
             arguments: merge_arguments(vanilla_builder.arguments, extract_arguments(&version_meta)),
             libraries: merged_libs,
             mods: custom_mods,
+            files: custom_files,
             natives: vanilla_builder.natives,
             client: vanilla_builder.client,
             assets_index: vanilla_builder.assets_index,

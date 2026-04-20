@@ -75,6 +75,7 @@ impl Query for QuiltQuery {
             arguments: merge_arguments(vanilla_builder.arguments, extract_arguments(full_data)),
             libraries: merge_libraries(vanilla_builder.libraries, quilt_libraries),
             mods: None,
+            files: vanilla_builder.files,
             natives: vanilla_builder.natives,
             client: vanilla_builder.client,
             assets_index: vanilla_builder.assets_index,

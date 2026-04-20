@@ -62,6 +62,7 @@ impl Query for FabricQuery {
     )?;
 
         // Merger directement avec Vanilla en priorité
+        let custom_files = version.get_custom_files().cloned();
         let custom_mods = version.get_custom_mods().cloned();
         
         Ok(Version {
@@ -70,6 +71,7 @@ impl Query for FabricQuery {
             arguments: merge_arguments(vanilla_builder.arguments, extract_arguments(full_data)),
             libraries: merge_libraries(vanilla_builder.libraries, fabric_libraries),
             mods: custom_mods,
+            files: custom_files,
             natives: vanilla_builder.natives,
             client: vanilla_builder.client,
             assets_index: vanilla_builder.assets_index,

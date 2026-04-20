@@ -7,6 +7,7 @@ mod downloader;
 mod verifier;
 mod libraries;
 mod mods;
+mod files;
 mod natives;
 mod client;
 mod assets;
@@ -26,5 +27,6 @@ pub use verifier::{
 };
 pub use mods::collect_mod_tasks_verified;
 pub use mods::collect_mod_tasks_with_allowlist;
+pub use files::collect_file_tasks_with_allowlist;
 pub use libraries::collect_library_tasks_with_allowlist;
 pub use natives::collect_native_tasks_with_allowlist;

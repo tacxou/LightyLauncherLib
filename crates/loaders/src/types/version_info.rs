@@ -92,6 +92,15 @@ pub trait VersionInfo: Clone + Send + Sync {
         None
     }
 
+    /// Retourne les custom files si disponibles
+    ///
+    /// Cette méthode est utilisée par les loaders pour inclure des fichiers personnalisés
+    /// dans les métadonnées de version. Par défaut, retourne `None`.
+    /// Implémentée par VersionBuilder pour fournir des fichiers personnalisés.
+    fn get_custom_files(&self) -> Option<&Vec<Mods>> {
+        None
+    }
+
     /// Retourne les custom libraries si disponibles
     ///
     /// Cette méthode est utilisée par les loaders pour inclure des libraries personnalisées

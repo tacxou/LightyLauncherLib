@@ -31,6 +31,7 @@ pub struct VersionBuilder<'a, L = ()> {
     pub game_dirs: PathBuf,
     pub java_dirs: PathBuf,
     pub custom_mods: Option<Vec<Mods>>,
+    pub custom_files: Option<Vec<Mods>>,
     pub custom_assets: Option<AssetsFile>,
     pub custom_libraries: Option<Vec<Library>>,
 }
@@ -57,6 +58,7 @@ impl<'a, L> VersionBuilder<'a, L> {
             game_dirs: project_dirs.data_dir().join(name),
             java_dirs: project_dirs.config_dir().to_path_buf().join("jre"),
             custom_mods: None,
+            custom_files: None,
             custom_assets: None,
             custom_libraries: None,
         }
@@ -124,6 +126,16 @@ impl<'a, L> VersionBuilder<'a, L> {
         self
     }
 
+    /// Ajoute des fichiers personnalisés
+    ///
+    /// Ajoute des fichiers personnalisés
+    ///
+    /// Ces fichiers sont fusionnés avec les mods custom lors de la construction finale.
+    pub fn with_files(mut self, files: Vec<Mods>) -> Self {
+        self.custom_files = Some(files);
+        self
+    }
+
     /// Ajoute des assets personnalisés
     ///
     /// # Exemple
@@ -186,6 +198,10 @@ impl<'a, L: Clone + Send + Sync + Debug> VersionInfo for VersionBuilder<'a, L> {
 
     fn get_custom_mods(&self) -> Option<&Vec<Mods>> {
         self.custom_mods.as_ref()
+    }
+
+    fn get_custom_files(&self) -> Option<&Vec<Mods>> {
+        self.custom_files.as_ref()
     }
     
     fn get_custom_libraries(&self) -> Option<&Vec<Library>> {

@@ -25,6 +25,7 @@ pub struct Version {
     pub arguments: Arguments,
     pub libraries: Vec<Library>,
     pub mods: Option<Vec<Mods>>,
+    pub files: Option<Vec<Mods>>,
     pub natives: Option<Vec<Native>>,
     pub client: Option<Client>,
     pub assets_index: Option<AssetIndex>,

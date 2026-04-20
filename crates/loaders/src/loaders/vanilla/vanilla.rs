@@ -91,6 +91,7 @@ impl Query for VanillaQuery {
     }
 
     async fn version_builder<V: VersionInfo>(version: &V, full_data: &VanillaMetaData) -> Result<Version> {
+        let custom_files = version.get_custom_files().cloned();
         let custom_mods = version.get_custom_mods().cloned();
         
         Ok(Version {
@@ -99,6 +100,7 @@ impl Query for VanillaQuery {
             arguments: extract_arguments(full_data),
             libraries: extract_libraries(full_data),
             mods: custom_mods,
+            files: custom_files,
             natives: Some(extract_natives(full_data)?),
             client: extract_client(version, full_data).ok(),
             assets_index: Some(extract_assets_index(full_data)),

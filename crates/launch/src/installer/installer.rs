@@ -10,7 +10,7 @@
 //! - Assets (textures, sounds, etc.)
 //! - Mods (optional modifications)
 
-use super::{libraries, natives, client, assets, mods};
+use super::{libraries, natives, client, assets, mods, files};
 use super::verifier::cleanup_game_directories;
 use lighty_loaders::types::{VersionInfo, version_metadata::Version};
 use lighty_core::{mkdir, time_it};
@@ -50,11 +50,12 @@ impl<T: VersionInfo> Installer for T {
 
         // Phase 1: Collect all tasks (single SHA1 verification pass)
         lighty_core::trace_info!("[Installer] Verifying installed files...");
-        let (library_tasks, client_task, asset_tasks, mod_tasks, (native_download_tasks, native_extract_paths)) = tokio::join!(
+        let (library_tasks, client_task, asset_tasks, mod_tasks, file_tasks, (native_download_tasks, native_extract_paths)) = tokio::join!(
             libraries::collect_library_tasks(self, &builder.libraries),
             client::collect_client_task(self, builder.client.as_ref()),
             assets::collect_asset_tasks(self, builder.assets.as_ref()),
             mods::collect_mod_tasks(self, builder.mods.as_deref().unwrap_or(&[])),
+            files::collect_file_tasks(self, builder.files.as_deref().unwrap_or(&[])),
             natives::collect_native_tasks(self, builder.natives.as_deref().unwrap_or(&[])),
         );
 
@@ -63,6 +64,7 @@ impl<T: VersionInfo> Installer for T {
             + client_task.as_ref().map(|_| 1).unwrap_or(0)
             + asset_tasks.len()
             + mod_tasks.len()
+            + file_tasks.len()
             + native_download_tasks.len();
 
         // Phase 2: Decide if installation is needed
@@ -101,6 +103,7 @@ impl<T: VersionInfo> Installer for T {
             &client_task,
             &asset_tasks,
             &mod_tasks,
+            &file_tasks,
             &native_download_tasks,
         );
 
@@ -131,6 +134,11 @@ impl<T: VersionInfo> Installer for T {
                 ),
                 mods::download_mods(
                     mod_tasks,
+                    #[cfg(feature = "events")]
+                    event_bus
+                ),
+                files::download_files(
+                    file_tasks,
                     #[cfg(feature = "events")]
                     event_bus
                 ),
@@ -229,6 +237,7 @@ fn calculate_download_size(
     client_task: &Option<(String, std::path::PathBuf)>,
     asset_tasks: &[(String, std::path::PathBuf)],
     mod_tasks: &[(String, std::path::PathBuf)],
+    file_tasks: &[(String, std::path::PathBuf)],
     native_download_tasks: &[(String, std::path::PathBuf)],
 ) -> u64 {
     let mut total = 0u64;
@@ -261,6 +270,15 @@ fn calculate_download_size(
         for (url, _) in mod_tasks {
             if let Some(_mod) = mods.iter().find(|m| m.url.as_ref() == Some(url)) {
                 total += _mod.size.unwrap_or(0);
+            }
+        }
+    }
+
+    // Custom files
+    if let Some(files) = &builder.files {
+        for (url, _) in file_tasks {
+            if let Some(file) = files.iter().find(|f| f.url.as_ref() == Some(url)) {
+                total += file.size.unwrap_or(0);
             }
         }
     }

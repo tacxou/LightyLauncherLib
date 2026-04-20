@@ -272,6 +272,10 @@ name = "neoforge_after_1-21_with_mods"
 required-features = ["neoforge", "tracing"]
 
 [[example]]
+name = "neoforge_after_1-21_with_files"
+required-features = ["neoforge", "tracing"]
+
+[[example]]
 name = "forge"
 required-features = ["forge", "tracing"]
 
